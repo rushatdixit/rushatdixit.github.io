@@ -139,6 +139,8 @@ const pageRect = (node) => {
   const pr = page.getBoundingClientRect(), r = node.getBoundingClientRect();
   return { x: r.left - pr.left, y: r.top - pr.top, w: r.width, h: r.height };
 };
+// the scene captions ("<- towards pluto" / "towards the sun ->") that are showing: callouts keep off them
+const captionRects = () => [...page.querySelectorAll('.page4-pluto, .page4-sun')].filter((el) => !el.hidden && el.offsetWidth).map(pageRect);
 // the right edge of the bio's text, line by line
 function bioRight() {
   let right = 0;
@@ -159,7 +161,7 @@ function bioRight() {
 let placedRects = [];       // for tests: every callout's final rect
 let lastLayout = null;
 let lastFail = null;        // the callout that did not fit, when the wide layout gives up (for tests)
-let live = [];              // leaders whose far end moves (to the belt's named rocks): { ln, rect, member }
+let live = [];              // leaders whose far end moves: { ln, rect, member } (a belt's named rock) or { ln, rect, spin: true } (Pluto's spin arrow)
 const setLine = (ln, a, b) => {
   ln.setAttribute('x1', Math.round(a.x) + 0.5); ln.setAttribute('y1', Math.round(a.y) + 0.5);
   ln.setAttribute('x2', Math.round(b.x) + 0.5); ln.setAttribute('y2', Math.round(b.y) + 0.5);
@@ -167,7 +169,14 @@ const setLine = (ln, a, b) => {
 function followMembers() {
   if (!live.length || !info.classList.contains('is-active') || !window.planetView) return;
   const ms = window.planetView.members();
+  const gNow = live.some((l) => l.spin) ? window.planetView.geometryNow() : null;
   for (const l of live) {
+    if (l.spin) {                                                  // Pluto's spin arrow, wherever it is now
+      if (!gNow) continue;
+      const end = gNow.arrow.reduce((a, b) => (b.x < a.x ? b : a), gNow.arrow[0]);
+      setLine(l.ln, nearestOnRect(l.rect, end), end);
+      continue;
+    }
     const m = ms[l.member];
     if (!m) continue;
     const n = nearestOnRect(l.rect, m), d = dist(n, m) || 1;
@@ -193,7 +202,8 @@ function layoutWide(v, g, scale) {
   const axisPts = [];
   const axLen = Math.hypot(g.axis.x2 - g.axis.x1, g.axis.y2 - g.axis.y1);
   for (let s = 0; s <= axLen; s += 3) axisPts.push({ x: g.axis.x1 + ((g.axis.x2 - g.axis.x1) * s) / axLen, y: g.axis.y1 + ((g.axis.y2 - g.axis.y1) * s) / axLen });
-  const guidePts = axisPts.concat(g.arc, g.arrow, [g.north, { x: g.north.x - 6, y: g.north.y - 8 }, { x: g.north.x + 6, y: g.north.y + 8 }]);
+  // the guides (and, for Pluto, everywhere they pass as it circles the shared point with Charon) and the rings' outline
+  const guidePts = axisPts.concat(g.arc, g.arrow, [g.north, { x: g.north.x - 6, y: g.north.y - 8 }, { x: g.north.x + 6, y: g.north.y + 8 }], g.sweep || [], g.ringPts || []);
   const sun = v.light && v.light[0] < 0 ? -1 : 1;            // which side the sun lights
   const outer = g.orbits.length ? g.orbits.reduce((a, b) => (b.r > a.r ? b : a)) : null;
   const orbitPts = outer ? outer.points.filter((p) => dist(p, disc) > disc.r + 4) : [];
@@ -212,7 +222,7 @@ function layoutWide(v, g, scale) {
   const anchored = (key) => {
     switch (anchors[key]) {
       case 'axis': return { key, target: g.arcMid, side: arcOut };
-      case 'spin': used.add('upper-left'); return { key, target: arrowLeft, side: { x: -1, y: 0.2 }, leader: () => [arrowLeft] };
+      case 'spin': used.add('upper-left'); return { key, target: arrowLeft, side: { x: -1, y: 0.2 }, leader: () => [arrowLeft], spin: !!g.moving };
       case 'moons': used.add('right'); return { key, target: outer ? { x: disc.x + outer.r, y: disc.y } : { x: disc.x + R, y: disc.y }, side: { x: 1, y: 0 },
         leader: outer ? (r) => [orbitPts.reduce((a, p) => (dist(nearestOnRect(r, p), p) < dist(nearestOnRect(r, a), a) ? p : a), orbitPts[0])] : null };
       case 'sunlit': { const z = sun > 0 ? 'lower-right' : 'lower-left'; used.add(z); return Object.assign({ key }, zones[z]); }
@@ -238,7 +248,7 @@ function layoutWide(v, g, scale) {
     slots.push(Object.assign({ key }, zones[z]));
   }
 
-  const taken = [headR];
+  const taken = [headR].concat(captionRects());              // the name, and the scene caption in the corner
   const leaders = [];
   placedRects = [];
   for (const s of slots) {
@@ -279,8 +289,9 @@ function layoutWide(v, g, scale) {
       for (const end of (s.leader && s.leader(r)) || []) {
         const start = nearestOnRect(r, end);
         if (dist(start, end) <= 6) continue;
-        if (segHitsDisc(start, end, disc, 2) || taken.some((t) => segHitsRect(start, end, t, 4))) { blockedLine = true; break; }
-        lines.push([start, end, s.members ? lines.length : -1]);
+        // a leader may cross the area a moving body sweeps (Pluto), but never the body where it is
+        if (segHitsDisc(start, end, s.spin ? g.body : disc, 2) || taken.some((t) => segHitsRect(start, end, t, 4))) { blockedLine = true; break; }
+        lines.push([start, end, s.members ? lines.length : s.spin ? 'spin' : -1]);
       }
       if (blockedLine) continue;
       found = { r, lines, vr };
@@ -302,7 +313,8 @@ function layoutWide(v, g, scale) {
     setLine(ln, a, b);
     ln.setAttribute('pathLength', '1');
     svg.appendChild(ln);
-    if (member >= 0) live.push({ ln, rect, member });            // the named rocks drift: these leaders follow them
+    if (member === 'spin') live.push({ ln, rect, spin: true });   // Pluto circles the shared point: its spin leader follows it
+    else if (member >= 0) live.push({ ln, rect, member });       // the named rocks drift: these leaders follow them
   }
   return true;
 }
@@ -313,12 +325,14 @@ function layoutList(v, g) {
   clearPositions();
   let top = Math.max(g.bottom, g.disc.y + g.outer) + 16;
   list.style.top = top + 'px';
+  // the list ends above the scene caption in the corner (or the screen's edge margin)
+  const floor = Math.min(v.cssH - EDGE, ...captionRects().map((r) => r.y - PAD));
   for (const scale of SCALES.filter((s) => s <= LIST_SCALE)) {
     info.style.setProperty('--co-scale', scale);
-    if (top + list.offsetHeight <= v.cssH - EDGE) break;
+    if (top + list.offsetHeight <= floor) break;
   }
   // never off screen: a list that still does not fit under the body moves up (over the field around it, never over the bio)
-  if (top + list.offsetHeight > v.cssH - EDGE) { top = Math.max(EDGE + head.offsetHeight + 16, v.cssH - EDGE - list.offsetHeight); list.style.top = top + 'px'; }
+  if (top + list.offsetHeight > floor) { top = Math.max(EDGE + head.offsetHeight + 16, floor - list.offsetHeight); list.style.top = top + 'px'; }
   placedRects = Object.entries(items).map(([key, c]) => Object.assign({ key }, pageRect(c)));
 }
 

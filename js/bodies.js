@@ -5,6 +5,7 @@
 // Fields
 //   id, name          lowercase id (used in the URL hash, e.g. #mars) and display name
 //   title             optional: the heading in the close-up, when it differs from the name (Pluto (dwarf planet))
+//   closeupScale      optional: draw the body this much smaller in its close-up, when what goes round it is wide (rings)
 //   kind              'planet', 'star' or 'belt': picks how the close-up is drawn
 //   axialTilt         degrees, for the drawn axis; over 90 means the body spins backwards
 //   moons, satellites names of the moons and artificial satellites drawn orbiting a planet
@@ -124,7 +125,7 @@ window.BODY_DATA = [
     background: BACKGROUNDS.jupiter,
   },
   {
-    id: 'saturn', name: 'Saturn', kind: 'planet',
+    id: 'saturn', name: 'Saturn', kind: 'planet', closeupScale: 0.55,
     axialTilt: 26.7, moons: ['Titan', 'Rhea', 'Iapetus', 'Dione', 'Tethys', 'Enceladus', 'Mimas'], satellites: [], moonCount: '280+', moonCountAsOf: MOON_COUNT_AS_OF,
     fields: planetFields({ tilt: 26.7, day: '0.44 Earth days', daySub: '10h 33m', year: '29.5 Earth years',
       temp: '−140°C', moons: moonsText(['Titan', 'Rhea', 'Iapetus', 'Dione', 'Tethys', 'Enceladus', 'Mimas'], '280+') }),
@@ -148,7 +149,7 @@ window.BODY_DATA = [
     background: BACKGROUNDS.neptune,
   },
   {
-    id: 'pluto', name: 'Pluto', title: 'Pluto (dwarf planet)', kind: 'planet',
+    id: 'pluto', name: 'Pluto', title: 'Pluto (dwarf planet)', kind: 'planet', closeupScale: 0.5,
     axialTilt: 122.5, moons: ['Charon', 'Nix', 'Hydra', 'Kerberos', 'Styx'], satellites: [], moonCount: null, moonCountAsOf: MOON_COUNT_AS_OF,
     fields: planetFields({ tilt: 122.5, tiltSub: 'it spins backwards', day: '6.4 Earth days', year: '248 Earth years',
       temp: 'about −230°C', moons: moonsText(['Charon', 'Nix', 'Hydra', 'Kerberos', 'Styx'], null) }),

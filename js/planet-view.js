@@ -7,7 +7,7 @@ const page = document.querySelector('.page4');
 const solar = document.querySelector('.solar-canvas');
 if (!page || !solar) return;
 
-const BUF = 256;                 // buffer size in art pixels
+const BUF = 448;                 // buffer size in art pixels (room for moons out to about 4.5 planet radii)
 const PR = 48;                   // planet radius in art pixels (96 across)
 const TAU = Math.PI * 2;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -25,7 +25,8 @@ const buf = new Uint32Array(img.data.buffer);
  *  Settings
  * ------------------------------------------------------------------ */
 // seconds for one full turn of each planet (slow, for show); Venus is the slowest and, with its 177.4 degree tilt, turns backwards
-const SPIN_S = { mercury: 150, venus: 240, earth: 80, mars: 84, sun: 70, 'asteroid-belt': 26 };   // the Sun: at its equator; the belt: Ceres
+const SPIN_S = { mercury: 150, venus: 240, earth: 80, mars: 84, sun: 70, 'asteroid-belt': 26,   // the Sun: at its equator; the belt: Ceres
+  jupiter: 40, saturn: 44, uranus: 60, neptune: 56, pluto: 30, 'kuiper-belt': 70 };       // Pluto turns once per Charon orbit (locked)            // the Kuiper belt: Arrokoth's tumble
 const SUN_PITCH = (22 * Math.PI) / 180;      // how far the north pole is tipped towards the viewer, so equators show as ellipses
 
 // orbit = radius in planet radii; period in seconds; r = body radius in art pixels; incl / node in degrees.
@@ -39,7 +40,48 @@ const ORBITS = {
   Tiangong: { kind: 'sat',  orbit: 1.2,  period: 6.6, incl: 41.5, node: 250, sprite: 'bar3' },
   GPS:      { kind: 'sat',  orbit: 1.75, period: 20,  incl: 55,   node: 320, sprite: 'block' },
   GOES:     { kind: 'sat',  orbit: 2.15, geo: true,    incl: 0,    node: 0,   sprite: 'plus' },
+  // Jupiter: the four Galilean moons
+  Io:        { kind: 'moon', orbit: 1.75, period: 10, r: 3.2, incl: 2,  node: 20,  color: [232, 206, 104] },
+  Europa:    { kind: 'moon', orbit: 2.25, period: 16, r: 2.9, incl: 4,  node: 150, color: [222, 212, 192] },
+  Ganymede:  { kind: 'moon', orbit: 2.85, period: 26, r: 4,   incl: 3,  node: 260, color: [170, 158, 146] },
+  Callisto:  { kind: 'moon', orbit: 3.55, period: 44, r: 3.8, incl: 5,  node: 330, color: [118, 108, 98] },
+  // Saturn: all outside the rings (which reach 2.27 radii)
+  Mimas:     { kind: 'moon', orbit: 2.45, period: 9,  r: 1.8, incl: 2,  node: 10,  color: [190, 190, 192] },
+  Enceladus: { kind: 'moon', orbit: 2.7,  period: 12, r: 2,   incl: 1,  node: 120, color: [240, 244, 250] },
+  Tethys:    { kind: 'moon', orbit: 2.95, period: 16, r: 2.5, incl: 2,  node: 230, color: [206, 206, 210] },
+  Dione:     { kind: 'moon', orbit: 3.2,  period: 21, r: 2.5, incl: 1,  node: 300, color: [196, 194, 196] },
+  Rhea:      { kind: 'moon', orbit: 3.5,  period: 28, r: 3,   incl: 2,  node: 70,  color: [186, 184, 182] },
+  Titan:     { kind: 'moon', orbit: 4.0,  period: 44, r: 4.4, incl: 1,  node: 190, color: [222, 170, 88] },
+  Iapetus:   { kind: 'moon', orbit: 4.5,  period: 70, r: 3,   incl: 15, node: 340, color: [150, 136, 118] },
+  // Uranus: in its equator plane, so (with the planet's 97.8 degree tilt) the orbits stand on their side
+  Miranda:   { kind: 'moon', orbit: 1.75,  period: 9,  r: 2,   incl: 4,  node: 30,  color: [190, 190, 196] },
+  Ariel:     { kind: 'moon', orbit: 2.1, period: 13, r: 2.6, incl: 0,  node: 100, color: [206, 204, 206] },
+  Umbriel:   { kind: 'moon', orbit: 2.45,  period: 18, r: 2.6, incl: 0,  node: 170, color: [128, 126, 128] },
+  Titania:   { kind: 'moon', orbit: 2.85, period: 28, r: 3.2, incl: 0,  node: 250, color: [196, 186, 180] },
+  Oberon:    { kind: 'moon', orbit: 3.3,  period: 38, r: 3.2, incl: 0,  node: 320, color: [176, 164, 158] },
+  // Neptune: Triton orbits backwards (an inclination over 90 degrees turns the orbit round)
+  Proteus:   { kind: 'moon', orbit: 1.6,  period: 8,  r: 2.2, incl: 1,  node: 60,  color: [120, 116, 112] },
+  Triton:    { kind: 'moon', orbit: 2.4,  period: 22, r: 3.6, incl: 157, node: 200, color: [222, 206, 200] },
+  Nereid:    { kind: 'moon', orbit: 3.6,  period: 60, r: 2,   incl: 28, node: 300, color: [176, 176, 180] },
+  // Pluto: everything circles the shared point between Pluto and Charon (the centre of the view; see PLUTO_WOBBLE)
+  Charon:    { kind: 'moon', orbit: 2.0,  period: 30, r: 24,  incl: 0,  node: 0,   color: [172, 168, 166] },
+  Styx:      { kind: 'moon', orbit: 3.0,  period: 40, r: 1.6, incl: 1,  node: 50,  color: [196, 196, 200] },
+  Nix:       { kind: 'moon', orbit: 3.3,  period: 48, r: 2,   incl: 0,  node: 140, color: [210, 210, 214] },
+  Kerberos:  { kind: 'moon', orbit: 3.6,  period: 56, r: 1.6, incl: 1,  node: 230, color: [150, 150, 154] },
+  Hydra:     { kind: 'moon', orbit: 3.9,  period: 64, r: 2,   incl: 1,  node: 310, color: [212, 212, 216] },
 };
+// Pluto and Charon circle a shared point between them (their barycentre): Pluto on a circle this many Pluto radii across,
+// opposite Charon, with Charon's period. (The real point is outside Pluto too; the distances here are squeezed to fit.)
+const PLUTO_WOBBLE = 1.15;
+// rings in a planet's equator plane, in planet radii: [inner, outer, colour, gaps [[from, to], ...]]
+const RINGS = {
+  saturn: { bands: [[1.24, 1.52, [150, 136, 108]], [1.52, 1.95, [230, 210, 162]], [2.02, 2.27, [206, 186, 140]]] },   // C, B (Cassini gap), A
+  uranus: { bands: [[1.3, 1.33, [150, 170, 182]], [1.4, 1.43, [140, 160, 172]], [1.52, 1.56, [176, 196, 206]]] },    // thin and faint
+};
+const ringOuter = (id) => (RINGS[id] ? RINGS[id].bands[RINGS[id].bands.length - 1][1] : 1);
+// when the space round a body is tight, orbits are squeezed only beyond this many radii (Saturn's and Uranus's rings, and
+// Pluto's own circle round the shared point with Charon, keep their size)
+const squeezeBase = (id) => (id === 'pluto' ? 2.0 : RINGS[id] ? ringOuter(id) : 1);
 const SPRITES = {
   bar5: [[-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [0, -1]],
   bar3: [[-1, 0], [0, 0], [1, 0], [0, 1]],
@@ -167,6 +209,64 @@ SURFACES['asteroid-belt'] = (X, Y, Z) => {
   if (spot < 0.09) c = mix3(c, [236, 236, 232], 1 - spot / 0.09);
   return c;
 };
+// the outer planets. t is the time in seconds (for clouds that drift relative to the planet's own spin)
+const lonOf = (X, Z) => Math.atan2(Z, X);
+const turn = (X, Z, a) => [X * Math.cos(a) - Z * Math.sin(a), X * Math.sin(a) + Z * Math.cos(a)];
+// Jupiter: cream, tan and rust bands, each drifting at its own speed, and the Great Red Spot riding its band
+SURFACES.jupiter = (X, Y, Z, t = 0) => {
+  const lat = Math.asin(Math.max(-1, Math.min(1, Y)));
+  const band = Math.floor((lat + 1.6) * 5.2);                         // which band (roughly ten across the disc)
+  const [x2, z2] = turn(X, Z, t * 0.02 * ((band % 3) - 1) + band * 0.7);   // this band's own drift
+  const wob = fbm(x2 * 3, Y * 9, z2 * 3, 41) * 0.9;
+  const v = Math.sin(lat * 15 + wob * 2.4);
+  let c = v > 0.45 ? [238, 224, 194] : v > -0.25 ? [208, 164, 116] : [178, 102, 66];
+  c = mix3(c, [250, 240, 216], clamp01((fbm(x2 * 6, Y * 14, z2 * 6, 43) - 0.62) * 3) * 0.5);
+  // the Great Red Spot: an oval about 22 degrees south, carried round by its band
+  const lon = lonOf(...turn(X, Z, t * 0.02 * 0.6));
+  const dl = Math.atan2(Math.sin(lon - 1.1), Math.cos(lon - 1.1)), dp = lat + 0.38;
+  const e = (dl / 0.34) ** 2 + (dp / 0.14) ** 2;
+  if (e < 1) c = mix3(c, e < 0.45 ? [196, 74, 50] : [214, 120, 84], 0.9);
+  return c;
+};
+// Saturn: soft gold bands
+SURFACES.saturn = (X, Y, Z, t = 0) => {
+  const lat = Math.asin(Math.max(-1, Math.min(1, Y)));
+  const [x2, z2] = turn(X, Z, t * 0.01);
+  const v = Math.sin(lat * 11 + fbm(x2 * 2, Y * 7, z2 * 2, 47) * 1.2);
+  const c = v > 0.35 ? [236, 214, 160] : v > -0.35 ? [220, 192, 136] : [198, 166, 112];
+  return Math.abs(Y) > 0.88 ? mix3(c, [176, 168, 140], 0.6) : c;      // greyer poles
+};
+// Uranus: pale cyan, almost featureless (a faint brighter polar cap)
+SURFACES.uranus = (X, Y, Z) => mix3([150, 214, 222], [190, 236, 238], clamp01((Y - 0.55) * 2.2) * 0.6 + fbm(X * 2, Y * 6, Z * 2, 53) * 0.12);
+// Neptune: deep blue, a dark spot with a white cloud beside it, and white streaks drifting faster than the planet turns
+SURFACES.neptune = (X, Y, Z, t = 0) => {
+  const lat = Math.asin(Math.max(-1, Math.min(1, Y)));
+  let c = mix3([34, 64, 180], [52, 98, 222], 0.5 + 0.5 * Math.sin(lat * 7 + fbm(X * 2, Y * 6, Z * 2, 59) * 2));
+  const lon = lonOf(X, Z);
+  const dl = Math.atan2(Math.sin(lon + 0.6), Math.cos(lon + 0.6)), dp = lat + 0.36;
+  const e = (dl / 0.3) ** 2 + (dp / 0.13) ** 2;
+  if (e < 1) c = mix3(c, [16, 28, 92], 0.85);                         // the dark spot
+  else if (((dl - 0.05) / 0.16) ** 2 + ((dp + 0.17) / 0.05) ** 2 < 1) c = [236, 242, 255];   // its white companion
+  const [x2, z2] = turn(X, Z, t * 0.06);
+  const streak = fbm(x2 * 5, Y * 26, z2 * 5, 61);
+  return mix3(c, [236, 242, 255], clamp01((streak - 0.64) * 5) * 0.9);
+};
+// Pluto: beige and grey, a dark equatorial patch, and the bright heart-shaped plain (Tombaugh Regio)
+SURFACES.pluto = (X, Y, Z) => {
+  let c = mix3([150, 138, 126], [218, 194, 164], fbm(X * 2.5, Y * 2.5, Z * 2.5, 67));
+  const lon = lonOf(X, Z), lat = Math.asin(Math.max(-1, Math.min(1, Y)));
+  // the heart faces away from Charon (Pluto keeps one face to Charon, at longitude 0 here), so it shows when Charon is behind
+  const dl = Math.atan2(Math.sin(lon - Math.PI), Math.cos(lon - Math.PI));
+  // the dark equatorial region to its west, with a ragged edge
+  const dark = ((dl + 1.5) / 0.95) ** 2 + ((lat + 0.05) / 0.3) ** 2 + (fbm(X * 4, Y * 4, Z * 4, 69) - 0.5) * 1.6;
+  if (dark < 1) c = mix3(c, [96, 66, 52], 0.8);
+  // the heart: (x^2 + y^2 - 1)^3 - x^2 y^3 < 0, centred on the plain, about 60 degrees across
+  const hx = dl / 0.5, hy = (lat - 0.32) / 0.42 + 0.15;
+  if ((hx * hx + hy * hy - 1) ** 3 - hx * hx * hy ** 3 < 0) c = mix3(c, [246, 238, 222], 0.9);
+  return c;
+};
+// Charon: grey, with a dark red polar cap
+SURFACES.charon = (X, Y, Z) => (Y > 0.75 ? mix3([120, 72, 56], [150, 140, 136], (1 - Y) * 3) : mix3([132, 128, 126], [176, 172, 170], fbm(X * 3, Y * 3, Z * 3, 71)));
 const generic = (X, Y, Z) => mix3([120, 120, 130], [190, 190, 200], fbm(X * 3, Y * 3, Z * 3, 2));
 
 /* ------------------------------------------------------------------ *
@@ -208,11 +308,11 @@ function shade(n, L) {
   return d > 0.28 ? 1 : d > 0.02 ? 0.74 : d > -0.2 ? 0.46 : 0.22;     // lit, soft terminator, terminator, dark side
 }
 
-function drawPlanet(p, fr, L, t) {
-  const surf = SURFACES[p.id] || generic;
-  const spin = -(TAU * t) / (SPIN_S[p.id] || 90);                      // negative so the surface moves left to right (west to east)
+// a planet's sphere, centred at (ox, oy) in the buffer, turning about its axis (surface from SURFACES)
+function drawSphere(id, ox, oy, fr, L, t) {
+  const surf = SURFACES[id] || generic;
+  const spin = -(TAU * t) / (SPIN_S[id] || 90);                        // negative so the surface moves left to right (west to east)
   const cs = Math.cos(spin), sn = Math.sin(spin);
-  const c0 = BUF / 2;
   for (let y = -PR; y <= PR; y++) {
     for (let x = -PR; x <= PR; x++) {
       const dx = (x + 0.5) / PR, dy = (y + 0.5) / PR, d2 = dx * dx + dy * dy;
@@ -221,21 +321,21 @@ function drawPlanet(p, fr, L, t) {
       const nb = n[0] * fr.b[0] + n[1] * fr.b[1] + n[2] * fr.b[2];
       const na = n[0] * fr.a[0] + n[1] * fr.a[1] + n[2] * fr.a[2];
       const nc = n[0] * fr.c[0] + n[1] * fr.c[1] + n[2] * fr.c[2];
-      const col = surf(nb * cs - nc * sn, na, nb * sn + nc * cs);
+      const col = surf(nb * cs - nc * sn, na, nb * sn + nc * cs, t);
       const k = shade(n, L);
-      put(c0 + x, c0 + y, rgb(col[0] * k, col[1] * k, col[2] * k));
+      put(ox + x, oy + y, rgb(col[0] * k, col[1] * k, col[2] * k));
     }
   }
 }
 
 function drawBody(b, sx, sy, scale, L, t) {
   if (b.kind === 'moon') {
-    const R = b.r * scale;
+    const R = b.r * scale, surf = SURFACES[b.name.toLowerCase()];     // a big moon (Charon) gets its own surface
     for (let y = -Math.ceil(R); y <= Math.ceil(R); y++) for (let x = -Math.ceil(R); x <= Math.ceil(R); x++) {
       const dx = (x + 0.5) / R, dy = (y + 0.5) / R, d2 = dx * dx + dy * dy;
       if (d2 > 1) continue;
-      const k = shade([dx, dy, Math.sqrt(1 - d2)], L);
-      put(sx + x, sy + y, rgb(b.color[0] * k, b.color[1] * k, b.color[2] * k));
+      const nz = Math.sqrt(1 - d2), k = shade([dx, dy, nz], L), col = surf ? surf(dx, -dy, nz) : b.color;
+      put(sx + x, sy + y, rgb(col[0] * k, col[1] * k, col[2] * k));
     }
     return R;
   }
@@ -245,13 +345,67 @@ function drawBody(b, sx, sy, scale, L, t) {
   return 2;
 }
 
+// rings in the planet's equator plane (RINGS), drawn per pixel: for each pixel, the point of the ring plane under it. Its
+// depth decides whether it is behind the planet (front = false, drawn first, so the sphere hides it) or in front of it.
+// A ring pixel whose line towards the sun passes through the planet is in the planet's shadow.
+let ringMask = new Uint8Array(BUF * BUF);       // ring pixels: floating names keep off them
+function drawRings(id, ox, oy, fr, L, front) {
+  const spec = RINGS[id];
+  if (!spec) return;
+  const a = fr.a, rOut = ringOuter(id), ext = Math.ceil(rOut * PR) + 1;
+  for (let y = -ext; y <= ext; y++) {
+    for (let x = -ext; x <= ext; x++) {
+      const dx = (x + 0.5) / PR, dy = (y + 0.5) / PR;
+      const z = -(a[0] * dx + a[1] * dy) / a[2];                      // on the ring plane (a . P = 0)
+      if ((z >= 0) !== front) continue;
+      const rho = Math.hypot(dx, dy, z);
+      const band = spec.bands.find(([r0, r1]) => rho >= r0 && rho < r1);
+      if (!band) continue;
+      const bd = dx * L[0] + dy * L[1] + z * L[2], cc = rho * rho - 1, disc = bd * bd - cc;
+      const inShadow = disc > 0 && -bd + Math.sqrt(disc) > 0 && -bd - Math.sqrt(disc) > 0;
+      const grain = 0.88 + 0.12 * Math.sin(rho * 90);                 // fine ringlets
+      const k = (inShadow ? 0.32 : 1) * grain;
+      put(ox + x, oy + y, rgb(band[2][0] * k, band[2][1] * k, band[2][2] * k));
+      const xi = Math.round(ox + x), yi = Math.round(oy + y);
+      if (xi >= 0 && yi >= 0 && xi < BUF && yi < BUF) ringMask[yi * BUF + xi] = 1;
+    }
+  }
+}
+
+// Arrokoth (the Kuiper belt's close-up): two flattened lobes joined at a narrow neck, reddish, tumbling slowly
+const ARROKOTH_LOBES = [{ o: -0.42, r: 0.64 }, { o: 0.62, r: 0.46 }];
+function drawArrokoth(L, t) {
+  const c0 = BUF / 2, ang = (TAU * t) / SPIN_S['kuiper-belt'] + 0.4, ca = Math.cos(ang), sa = Math.sin(ang);
+  const ext = Math.ceil(1.15 * PR);
+  for (let y = -ext; y <= ext; y++) {
+    for (let x = -ext; x <= ext; x++) {
+      const u = ((x + 0.5) * ca + (y + 0.5) * sa) / PR, v = (-(x + 0.5) * sa + (y + 0.5) * ca) / PR;
+      let best = null;
+      ARROKOTH_LOBES.forEach((lb, li) => {
+        const du = u - lb.o, q = (du * du + v * v) / (lb.r * lb.r);
+        if (q > 1) return;
+        const flat = 0.6 * lb.r, z = flat * Math.sqrt(1 - q);
+        if (!best || z > best.z) best = { z, du, v, r: lb.r, flat, li };
+      });
+      if (!best) continue;
+      // the ellipsoid's normal, turned back into the picture
+      const nu = best.du / (best.r * best.r), nv = best.v / (best.r * best.r), nz = best.z / (best.flat * best.flat);
+      const n = norm([nu * ca - nv * sa, nu * sa + nv * ca, nz]);
+      const k = shade(n, L);
+      const mott = fbm(u * 3 + best.li * 7, v * 3, best.z * 3, 73);
+      const col = mix3([150, 78, 62], [196, 118, 92], mott);
+      put(c0 + x, c0 + y, rgb(col[0] * k, col[1] * k, col[2] * k));
+    }
+  }
+}
+
 // the rotation axis and its guides, in buffer px (x right, y down, z towards the viewer). Points behind the disc are left out.
 // The axis is tilted from vertical by the real axial tilt (the orbital plane's normal is vertical on screen); its north end
 // is tipped towards the viewer, so for Venus (177.4 degrees) the north pole is at the bottom.
-function guidesFor(fr) {
-  const c0 = BUF / 2, a = fr.a;
-  const at = (s) => [c0 + s * a[0], c0 + s * a[1], s * a[2]];
-  const hidden = (x, y, z) => z < 0 && Math.hypot(x - c0, y - c0) < PR + 0.5;
+function guidesFor(fr, ox = BUF / 2, oy = BUF / 2) {
+  const c0 = ox, a = fr.a;
+  const at = (s) => [ox + s * a[0], oy + s * a[1], s * a[2]];
+  const hidden = (x, y, z) => z < 0 && Math.hypot(x - ox, y - oy) < PR + 0.5;
   const axis = [];
   for (let s = -AXIS_EXT * PR; s <= AXIS_EXT * PR; s += 0.5) {
     if (Math.abs(s) < PR) continue;                                   // inside the planet
@@ -260,13 +414,13 @@ function guidesFor(fr) {
   }
   const L = AXIS_EXT * PR * Math.hypot(a[0], a[1]);                   // the axis's length on screen, centre to end
   const vref = [];
-  for (let s = PR + 2; s <= L; s += 2) vref.push([c0, c0 - s]);       // faint vertical reference (dotted)
+  for (let s = PR + 2; s <= L; s += 2) vref.push([ox, oy - s]);       // faint vertical reference (dotted)
   const ang = Math.atan2(a[0], -a[1]);                                // north end, clockwise from straight up
   const arc = [];
   const steps = Math.max(1, Math.ceil(Math.abs(ang) * ARC_R * PR / 2));
   for (let i = 0; i <= steps; i++) {
     const th = (ang * i) / steps;
-    arc.push([c0 + ARC_R * PR * Math.sin(th), c0 - ARC_R * PR * Math.cos(th)]);
+    arc.push([ox + ARC_R * PR * Math.sin(th), oy - ARC_R * PR * Math.cos(th)]);
   }
   // the spin arrow: about 270 degrees of a small circle around the upper end of the axis, open at the back. It turns the
   // same way as the surface (counter-clockwise seen from the north pole), so on Venus it points the other way.
@@ -283,7 +437,7 @@ function guidesFor(fr) {
   const head = [];
   for (let k = 1; k <= 3; k++) head.push([tip[0] - tx * k - ty * k, tip[1] - ty * k + tx * k], [tip[0] - tx * k + ty * k, tip[1] - ty * k - tx * k]);
   const north = at(AXIS_EXT * PR + 5);
-  return { c0, a, axis, vref, arc, ang, ring, head, tip, north, ends: [at(AXIS_EXT * PR), at(-AXIS_EXT * PR)] };
+  return { c0, ox, oy, a, axis, vref, arc, ang, ring, head, tip, north, ends: [at(AXIS_EXT * PR), at(-AXIS_EXT * PR)] };
 }
 
 let guideMask = new Uint8Array(BUF * BUF);       // pixels covered by the guides: floating names keep off them
@@ -367,23 +521,31 @@ const FIELD = Array.from({ length: 72 }, () => {
   return { x0: randA(), y: (randA() * 2 - 1) * 1.6 * PR * (0.55 + 0.45 * randA()), z, r: (1.2 + randA() * 2.6) * (0.75 + 0.35 * z),
     vx: (0.5 + randA() * 1.4) * (1.1 + 0.6 * z), spin: (randA() * 2 - 1) * 1.6, seed: Math.floor(randA() * 1000), tone: 0.8 + randA() * 0.35 };
 });
-// the named rocks: home direction (radians, from the right, clockwise) and distance in planet radii, size in art pixels
-const MEMBERS = { Vesta: { a: -0.55, d: 1.95, r: 6, spin: 0.5, seed: 3 }, Pallas: { a: 0.35, d: 1.9, r: 5.2, spin: -0.7, seed: 8 }, Hygiea: { a: 0.75, d: 1.85, r: 4.4, spin: 0.9, seed: 13 } };
+// the named rocks: home direction (radians, from the right, clockwise) and distance in planet radii, size in art pixels;
+// stretch makes a rock long (Haumea), color overrides the belt's rock colour
+const MEMBERS = {
+  Vesta: { a: -0.55, d: 1.95, r: 6, spin: 0.5, seed: 3 }, Pallas: { a: 0.35, d: 1.9, r: 5.2, spin: -0.7, seed: 8 }, Hygiea: { a: 0.75, d: 1.85, r: 4.4, spin: 0.9, seed: 13 },
+  Haumea: { a: -0.6, d: 1.9, r: 5.5, spin: 0.9, seed: 17, stretch: 1.9, color: [226, 232, 242] },
+  Makemake: { a: 0.55, d: 1.95, r: 5, spin: -0.4, seed: 19, color: [214, 170, 140] },
+};
+const ICY = [176, 196, 222];        // the Kuiper belt's field: icy rocks
 let fieldRange = [0, BUF];          // where rocks may drift (buffer x): inside the right half, never behind the bio
 let lastMembers = [];               // the named rocks as drawn last (css px), for the leader lines
 
 // an irregular, tumbling pixel rock, lit from the sun's side
-function rock(cx, cy, r, ang, seed, L, tone, bright) {
-  const R = Math.ceil(r * 1.35);
+function rock(cx, cy, r, ang, seed, L, tone, bright, col = [138, 128, 116], stretch = 1) {
+  const R = Math.ceil(r * 1.35 * stretch);
   for (let y = -R; y <= R; y++) for (let x = -R; x <= R; x++) {
-    const d = Math.hypot(x, y);
+    // a long rock: squash the x axis of its own (turning) frame
+    const ca = Math.cos(ang), sa = Math.sin(ang), lx = (x * ca + y * sa) / stretch, ly = -x * sa + y * ca;
+    const d = Math.hypot(lx, ly);
     if (d > r * 1.35) continue;
-    const phi = Math.atan2(y, x) - ang;
+    const phi = Math.atan2(ly, lx);
     const edge = r * (0.72 + 0.5 * vnoise(Math.cos(phi) * 1.4 + 5, Math.sin(phi) * 1.4 + 5, seed, 71));
     if (d > edge) continue;
-    const lit = (x * L[0] + y * L[1]) / (d || 1) * Math.min(1, d / (edge * 0.6)) + L[2] * 0.6;
+    const lit = (x * L[0] + y * L[1]) / (Math.hypot(x, y) || 1) * Math.min(1, d / (edge * 0.6)) + L[2] * 0.6;
     const k = (lit > 0.45 ? 1 : lit > 0 ? 0.7 : 0.42) * bright;
-    put(cx + x, cy + y, rgb(138 * tone * k, 128 * tone * k, 116 * tone * k));
+    put(cx + x, cy + y, rgb(col[0] * tone * k, col[1] * tone * k, col[2] * tone * k));
   }
 }
 function memberPos(name, t, i) {
@@ -391,31 +553,46 @@ function memberPos(name, t, i) {
   const bob = 2.2 * Math.sin((TAU * t) / (8 + i * 1.7) + i);
   return { x: c0 + Math.cos(m.a) * dd + bob * 0.6, y: c0 + Math.sin(m.a) * dd + bob, m };
 }
+// the field of rocks drifting past (front = the near half): grey rocks for the asteroid belt, icy ones for the Kuiper belt,
+// nearer ones bigger and brighter
 function drawField(front, t, L) {
-  const span = fieldRange[1] - fieldRange[0];
+  const span = fieldRange[1] - fieldRange[0], icy = planet.id === 'kuiper-belt';
   for (const a of FIELD) {
     if ((a.z >= 0) !== front) continue;
     const x = fieldRange[0] + ((((a.x0 * span + a.vx * t) % span) + span) % span);
-    rock(x, BUF / 2 + a.y, a.r, a.spin * t, a.seed, L, a.tone, 0.55 + 0.35 * (a.z + 1) / 2 + 0.1);
+    rock(x, BUF / 2 + a.y, icy ? a.r * 0.8 : a.r, a.spin * t, a.seed, L, a.tone, 0.55 + 0.35 * (a.z + 1) / 2 + 0.1, icy ? ICY : undefined);
   }
+}
+
+// Pluto's offset from the shared point (buffer px, with depth): opposite Charon, PLUTO_WOBBLE radii out
+function plutoOffset(items) {
+  const ch = items.find((it) => it.b.name === 'Charon');
+  if (!ch) return [0, 0, 0];
+  const l = Math.hypot(ch.P[0], ch.P[1], ch.P[2]) || 1, k = -(PLUTO_WOBBLE * PR) / l;
+  return [ch.P[0] * k, ch.P[1] * k, ch.P[2] * k];
 }
 
 function render(t, view) {
   buf.fill(0);                                           // transparent: the gradient behind shows through
+  ringMask.fill(0);
   const L = norm(view.light || [0.6, 0.45, 0.65]);
   const fr = frameFor(planet);
   const c0 = BUF / 2;
   const items = orbitItems(fr, t);
-  const g = guidesFor(fr);
+  const kuiper = planet.id === 'kuiper-belt';
+  // Pluto circles the shared point with Charon (the middle of the view), so its centre moves
+  const wob = planet.id === 'pluto' ? plutoOffset(items) : [0, 0, 0];
+  const ox = c0 + wob[0], oy = c0 + wob[1];
+  const g = kuiper ? null : guidesFor(fr, ox, oy);
   const toBuf = (r) => [(r.x - box.left) / box.k, (r.y - box.top) / box.k, r.w / box.k, r.h / box.k];
   const blocked = obstacles.map(toBuf);
 
-  // orbit lines (dotted): the part behind the planet first, the part in front of it after
+  // orbit lines (dotted, round the middle of the view): the part behind the planet first, the part in front of it after
   const lines = (front) => {
     for (const it of items) {
       for (let k = 0; k < 140; k += 2) {
         const P = it.at((k / 140) * TAU);
-        if ((P[2] >= 0) !== front) continue;
+        if ((P[2] >= wob[2]) !== front) continue;
         const d = clamp01(0.45 + 0.55 * (P[2] / it.r * 0.5 + 0.5));
         put(c0 + P[0], c0 + P[1], rgb(86 * d, 92 * d, 112 * d));
       }
@@ -423,55 +600,62 @@ function render(t, view) {
   };
   const drawn = [];
   const bodiesPass = (front) => {
-    items.filter((it) => (it.P[2] >= 0) === front).sort((p, q) => p.P[2] - q.P[2]).forEach((it) => {
+    items.filter((it) => (it.P[2] >= wob[2]) === front).sort((p, q) => p.P[2] - q.P[2]).forEach((it) => {
       const scale = 1 + 0.18 * (it.P[2] / (it.r || 1));
       const sx = c0 + it.P[0], sy = c0 + it.P[1];
       const rad = drawBody(it.b, sx, sy, scale, L, t);
-      const behind = it.P[2] < 0 && Math.hypot(it.P[0], it.P[1]) < PR + rad;       // hidden behind the planet: no name to show
-      if (!behind) drawn.push({ name: it.b.name, x: sx, y: sy, r: rad });
+      const over = Math.hypot(sx - ox, sy - oy) < PR + rad, behind = it.P[2] < wob[2] && over;   // hidden behind the planet: no name
+      if (!behind) drawn.push({ name: it.b.name, x: sx, y: sy, r: rad, onFace: over });     // crossing its face: the name may sit on it
     });
   };
   lines(false); bodiesPass(false);
   if (planet.kind === 'belt') drawField(false, t, L);
-  if (planet.kind === 'star') drawStar(planet, fr, t); else drawPlanet(planet, fr, L, t);
-  drawGuides(g, planet.kind === 'star');
+  drawRings(planet.id, ox, oy, fr, L, false);
+  if (planet.kind === 'star') drawStar(planet, fr, t);
+  else if (kuiper) drawArrokoth(L, t);
+  else drawSphere(planet.id, ox, oy, fr, L, t);
+  drawRings(planet.id, ox, oy, fr, L, true);
+  if (g) drawGuides(g, planet.kind === 'star'); else guideMask = new Uint8Array(BUF * BUF);
+  if (wob[0] || wob[1]) {                                // the shared point Pluto and Charon circle: a faint "+"
+    for (let d = -2; d <= 2; d++) { put(c0 + d, c0, rgb(150, 150, 170)); put(c0, c0 + d, rgb(150, 150, 170)); }
+  }
   lines(true); bodiesPass(true);
   if (planet.kind === 'belt') {
     drawField(true, t, L);
     lastMembers = (planet.members || []).map((name, i) => {
       const p = memberPos(name, t, i);
-      rock(p.x, p.y, p.m.r, p.m.spin * t, p.m.seed, L, 1.05, 1);
-      drawn.push({ name, x: p.x, y: p.y, r: p.m.r });                 // named like the moons
-      return { name, x: box.left + p.x * box.k, y: box.top + p.y * box.k, r: p.m.r * box.k };
+      rock(p.x, p.y, p.m.r, p.m.spin * t, p.m.seed, L, 1.05, 1, p.m.color, p.m.stretch);
+      drawn.push({ name, x: p.x, y: p.y, r: p.m.r * (p.m.stretch || 1) });             // named like the moons
+      return { name, x: box.left + p.x * box.k, y: box.top + p.y * box.k, r: p.m.r * (p.m.stretch || 1) * box.k };
     });
   }
 
-  // names float just above each body and move with it; they never overlap each other, the planet, the axis guides
-  // or the callouts around the planet
+  // names float just above each body and move with it; they never overlap each other, the planet, its rings, the axis
+  // guides or the callouts around the planet (the callouts keep their places: the names move out of their way)
   const rects = [], LABEL = rgb(232, 232, 240);
-  stats = { labels: drawn.length, placed: 0, skipped: 0, rects: [], angle: null };
+  stats = { labels: drawn.length, placed: 0, skipped: 0, rects: [], angle: null, skippedNames: [] };
   const hitsPlanet = (x0, y0, w, h) => {
-    const nx = Math.max(x0, Math.min(c0, x0 + w)), ny = Math.max(y0, Math.min(c0, y0 + h));
-    return Math.hypot(nx - c0, ny - c0) < PR + 1;
+    const nx = Math.max(x0, Math.min(ox, x0 + w)), ny = Math.max(y0, Math.min(oy, y0 + h));
+    return Math.hypot(nx - ox, ny - oy) < PR * (kuiper ? 1.1 : 1) + 1;
   };
   const hitsGuides = (x0, y0, w, h) => {
-    for (let y = Math.max(0, y0); y < Math.min(BUF, y0 + h); y++) for (let x = Math.max(0, x0); x < Math.min(BUF, x0 + w); x++) if (guideMask[y * BUF + x]) return true;
+    for (let y = Math.max(0, y0); y < Math.min(BUF, y0 + h); y++) for (let x = Math.max(0, x0); x < Math.min(BUF, x0 + w); x++) if (guideMask[y * BUF + x] || ringMask[y * BUF + x]) return true;
     return false;
   };
   // on screen (8 css px in from the edges), off the planet and the guides, and 2 px clear of other names and the callouts
   const sx0 = (8 - box.left) / box.k, sx1 = (screen.w - 8 - box.left) / box.k, sy0 = (8 - box.top) / box.k, sy1 = (screen.h - 8 - box.top) / box.k;
-  const free = (x0, y0, w, h) => x0 - 1 >= sx0 && x0 + w + 1 <= sx1 && y0 - 1 >= sy0 && y0 + h + 1 <= sy1
-    && !hitsPlanet(x0 - 1, y0 - 1, w + 2, h + 2) && !hitsGuides(x0 - 1, y0 - 1, w + 2, h + 2)
+  const free = (x0, y0, w, h, onFace = false) => x0 - 1 >= sx0 && x0 + w + 1 <= sx1 && y0 - 1 >= sy0 && y0 + h + 1 <= sy1
+    && (onFace || !hitsPlanet(x0 - 1, y0 - 1, w + 2, h + 2)) && !hitsGuides(x0 - 1, y0 - 1, w + 2, h + 2)
     && !rects.concat(blocked).some((r) => x0 - 2 < r[0] + r[2] && x0 + w + 2 > r[0] && y0 - 2 < r[1] + r[3] && y0 + h + 2 > r[1]);
 
   // without callouts around the planet (narrow screens), the angle arc gets its own small label
-  if (mode !== 'wide') {
+  if (mode !== 'wide' && g) {
     const str = String(planet.axialTilt) + '°', w = textW(str), h = 5;
     // beside the middle of the arc if there is room, otherwise further along it (Venus's arc runs down the whole side)
     const spots = [];
     for (const f of [0.5, 0.35, 0.65, 0.2, 0.8, 0.1, 0.9]) {
       for (const r of [ARC_R * PR + 4, ARC_R * PR - 3]) {
-        const ax = c0 + r * Math.sin(g.ang * f), ay = c0 - r * Math.cos(g.ang * f);
+        const ax = ox + r * Math.sin(g.ang * f), ay = oy - r * Math.cos(g.ang * f);
         spots.push([ax + 2, ay - h / 2], [ax - w / 2, ay - h - 2], [ax - w - 2, ay - h / 2], [ax + 2, ay - h - 2], [ax - w / 2, ay + 3]);
       }
     }
@@ -488,31 +672,48 @@ function render(t, view) {
     const w = textW(d.name), h = 5, gap = d.r + 4;
     const spots = [[d.x - w / 2, d.y - gap - h], [d.x - w / 2, d.y + gap], [d.x + gap, d.y - 2], [d.x - gap - w, d.y - 2], [d.x + gap * 0.7, d.y - gap * 0.7 - h], [d.x - gap * 0.7 - w, d.y - gap * 0.7 - h],
       [d.x + gap * 0.7, d.y + gap * 0.7], [d.x - gap * 0.7 - w, d.y + gap * 0.7],
-      [d.x - w + 3, d.y - gap - h], [d.x - w + 3, d.y + gap], [d.x - 3, d.y - gap - h], [d.x - 3, d.y + gap],        // above or below, shifted sideways
-      [d.x - w / 2, d.y - gap * 2 - h], [d.x - w / 2, d.y + gap * 2], [d.x + gap * 2, d.y - 2], [d.x - gap * 2 - w, d.y - 2]];       // then farther out
-    const spot = spots.find(([x0, y0]) => {
+      [d.x - w + 3, d.y - gap - h], [d.x - w + 3, d.y + gap], [d.x - 3, d.y - gap - h], [d.x - 3, d.y + gap]];        // above or below, shifted sideways
+    for (const k of [2, 3, 4]) spots.push([d.x - w / 2, d.y - gap * k - h], [d.x - w / 2, d.y + gap * k], [d.x + gap * k, d.y - 2], [d.x - gap * k - w, d.y - 2]);   // then farther out
+    const ok = ([x0, y0]) => {
       x0 = Math.round(x0); y0 = Math.round(y0);
       if (x0 < 1 || y0 < 1 || x0 + w > BUF - 1 || y0 + h > BUF - 1) return false;
-      return free(x0, y0, w, h);
-    });
-    if (!spot) { stats.skipped++; continue; }
+      return free(x0, y0, w, h, d.onFace);
+    };
+    let spot = spots.find(ok), far = false;
+    // still nowhere: the nearest clear spot further out, joined to the body by a dotted leader
+    for (let dist = gap * 2; !spot && dist <= gap + 70; dist += 3) {
+      for (let k = 0; k < 24 && !spot; k++) {
+        const th = (k / 24) * TAU - Math.PI / 2, c = Math.cos(th), sn = Math.sin(th);
+        const cand = [d.x + c * (dist + (w / 2) * Math.abs(c)) - w / 2, d.y + sn * (dist + (h / 2) * Math.abs(sn)) - h / 2];
+        if (ok(cand)) { spot = cand; far = true; }
+      }
+    }
+    if (!spot) { stats.skipped++; stats.skippedNames.push(d.name); continue; }
     const x0 = Math.round(spot[0]), y0 = Math.round(spot[1]);
+    if (far) {
+      const tx = Math.max(x0, Math.min(d.x, x0 + w)), ty = Math.max(y0, Math.min(d.y, y0 + h)), len = Math.hypot(tx - d.x, ty - d.y);
+      for (let i = Math.ceil(d.r) + 2; i < len - 1; i += 2) put(d.x + ((tx - d.x) * i) / len, d.y + ((ty - d.y) * i) / len, rgb(150, 154, 170));
+    }
     for (let y = y0 - 1; y <= y0 + h; y++) for (let x = x0 - 1; x <= x0 + w; x++) put(x, y, 0xff000000);
     drawText(d.name, x0, y0, LABEL);
     rects.push([x0, y0, w, h]);
     stats.rects.push({ name: d.name, x: box.left + (x0 - 1) * box.k, y: box.top + (y0 - 1) * box.k, w: (w + 2) * box.k, h: (h + 2) * box.k });
     stats.placed++;
   }
+  lastWobble = wob;
   ctx.putImageData(img, 0, 0);
 }
+let lastWobble = [0, 0, 0];
 
 // moons and satellites on tilted ellipses in the planet's equatorial frame, at time t
 function orbitItems(fr, t) {
+  const base = squeezeBase(planet.id);
   return bodiesFor(planet).map((b, i) => {
     const node = (b.node * Math.PI) / 180, inc = (b.incl * Math.PI) / 180;
     const u = [0, 1, 2].map((k) => Math.cos(node) * fr.b[k] + Math.sin(node) * fr.c[k]);
     const w = [0, 1, 2].map((k) => Math.cos(inc) * (-Math.sin(node) * fr.b[k] + Math.cos(node) * fr.c[k]) + Math.sin(inc) * fr.a[k]);
-    const r = PR * (1 + (b.orbit - 1) * orbitScale);                  // the squeeze only shrinks the gap above the surface, never into the planet
+    // the squeeze only shrinks the gap beyond `base` (the surface, the rings, or Pluto's own circle), never into it
+    const r = PR * (b.orbit > base ? base + (b.orbit - base) * orbitScale : b.orbit);
     const spinT = (TAU * t) / (SPIN_S[planet.id] || 90);
     const theta = b.geo ? Math.PI / 2 + spinT : (b.phase0 || i * 2.1) + (TAU * t) / b.period;
     const at = (th) => [0, 1, 2].map((k) => r * (Math.cos(th) * u[k] + Math.sin(th) * w[k]));
@@ -520,29 +721,54 @@ function orbitItems(fr, t) {
   });
 }
 
-// where the planet, its axis guides and its moon orbits are, in css px relative to the page (the callouts are laid out from this)
-function geometry() {
+// where the planet, its axis guides and its moon orbits are, in css px relative to the page (the callouts are laid out from
+// this). For Pluto, which circles the shared point with Charon, the guides are where they are now (`sweep` holds every
+// place they pass through, so callouts keep clear of all of them) and `moving` asks for leaders that follow.
+function geometry(t = 0) {
   if (!planet) return null;
-  const fr = frameFor(planet), g = guidesFor(fr), c0 = BUF / 2;
+  const fr = frameFor(planet), c0 = BUF / 2, kuiper = planet.id === 'kuiper-belt';
+  const items = orbitItems(fr, t), wob = planet.id === 'pluto' ? plutoOffset(items) : [0, 0, 0];
   const css = ([x, y]) => ({ x: box.left + x * box.k, y: box.top + y * box.k });
   const bbox = (pts) => {
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
     return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs) + box.k, h: Math.max(...ys) - Math.min(...ys) + box.k };
   };
-  const arc = g.arc.map(css), ring = g.ring.concat(g.head, [g.tip]).map(css);
-  const orbits = orbitItems(fr, 0).filter((it) => it.b.kind === 'moon').map((it) => ({
+  const centre = css([c0, c0]);
+  // the Kuiper belt's Arrokoth has no axis drawn: its guides collapse onto the middle
+  const g = kuiper ? null : guidesFor(fr, c0 + wob[0], c0 + wob[1]);
+  const arc = g ? g.arc.map(css) : [centre], ring = g ? g.ring.concat(g.head, [g.tip]).map(css) : [centre];
+  const orbits = items.filter((it) => it.b.kind === 'moon').map((it) => ({
     name: it.b.name, r: it.r * box.k,
     points: Array.from({ length: 96 }, (_, k) => it.at((k / 96) * TAU)).map((P) => css([c0 + P[0], c0 + P[1]])),
   }));
-  const ends = g.ends.map(css), north = css(g.north);
-  const guides = [...ends, north, ...ring, ...arc, css([c0, c0 - AXIS_EXT * PR * Math.hypot(g.a[0], g.a[1])])];
+  const ends = g ? g.ends.map(css) : [centre, centre], north = g ? css(g.north) : centre;
+  const swept = PR * (planet.id === 'pluto' ? 1 + PLUTO_WOBBLE : kuiper ? 1.15 : 1);
+  const guides = [...ends, north, ...ring, ...arc, { x: centre.x, y: centre.y - swept * box.k }, { x: centre.x, y: centre.y + swept * box.k }];
+  if (g) guides.push(css([g.ox, g.oy - AXIS_EXT * PR * Math.hypot(g.a[0], g.a[1])]));
+  // everything the guides pass through while Pluto circles (12 places round its circle)
+  const sweep = [];
+  if (planet.id === 'pluto') {
+    for (let k = 0; k < 12; k++) {
+      const th = (k / 12) * TAU, o = [0, 1, 2].map((q) => PLUTO_WOBBLE * PR * (Math.cos(th) * fr.b[q] + Math.sin(th) * fr.c[q]));
+      const gk = guidesFor(fr, c0 + o[0], c0 + o[1]);
+      for (const p of gk.arc.concat(gk.ring, gk.head, [gk.north], gk.ends.map((e) => [e[0], e[1]]))) sweep.push(css(p));
+    }
+  }
+  // the rings' outline (callouts keep off it)
+  const ringPts = [];
+  if (RINGS[planet.id]) {
+    const R = ringOuter(planet.id) * PR;
+    for (let k = 0; k < 72; k++) { const th = (k / 72) * TAU; ringPts.push(css([c0 + R * (Math.cos(th) * fr.b[0] + Math.sin(th) * fr.c[0]), c0 + R * (Math.cos(th) * fr.b[1] + Math.sin(th) * fr.c[1])])); }
+  }
+  const all = guides.concat(sweep, ringPts);
   return {
-    disc: { x: box.left + c0 * box.k, y: box.top + c0 * box.k, r: PR * box.k },
+    disc: { x: centre.x, y: centre.y, r: swept * box.k },
+    body: { x: box.left + (c0 + wob[0]) * box.k, y: box.top + (c0 + wob[1]) * box.k, r: PR * box.k },   // the disc itself, where it is now
     axis: { x1: ends[0].x, y1: ends[0].y, x2: ends[1].x, y2: ends[1].y },
-    north, arc, arcBox: bbox(arc), arcMid: arc[Math.floor(arc.length / 2)], angle: g.ang,
-    arrow: ring, arrowBox: bbox(ring),
-    top: Math.min(...guides.map((p) => p.y)), bottom: Math.max(...guides.map((p) => p.y)),
-    orbits, outer: Math.max(0, ...orbitItems(fr, 0).map((it) => it.r), ...(planet.members || []).map((n, i) => { const p = memberPos(n, 0, i); return Math.hypot(p.x - c0, p.y - c0) + p.m.r + 3; })) * box.k,   // the outermost orbit (moons, satellites, named rocks)
+    north, arc, arcBox: bbox(arc), arcMid: arc[Math.floor(arc.length / 2)], angle: g ? g.ang : 0,
+    arrow: ring, arrowBox: bbox(ring), sweep, ringPts, moving: planet.id === 'pluto', noAxis: !g,
+    top: Math.min(...all.map((p) => p.y)), bottom: Math.max(...all.map((p) => p.y)),
+    orbits, outer: Math.max(0, ...items.map((it) => it.r), ringOuter(planet.id) * PR, ...(planet.members || []).map((n, i) => { const p = memberPos(n, 0, i); return Math.hypot(p.x - c0, p.y - c0) + p.m.r * (p.m.stretch || 1) + 3; })) * box.k,   // the outermost orbit (moons, satellites, rings, named rocks)
     members: lastMembers.length ? lastMembers.map((m) => Object.assign({}, m)) : (planet.members || []).map((n, i) => { const p = memberPos(n, 0, i); return { name: n, x: box.left + p.x * box.k, y: box.top + p.y * box.k, r: p.m.r * box.k }; }),
   };
 }
@@ -550,7 +776,7 @@ function geometry() {
 /* ------------------------------------------------------------------ *
  *  Placement and loop
  * ------------------------------------------------------------------ */
-let running = false, t0 = performance.now();
+let running = false, t0 = performance.now(), lastT = 12;
 
 function place(view) {
   const px = view.PX, e = view.endState;
@@ -567,12 +793,13 @@ function place(view) {
   const colEdge = mode === 'phone' ? 8 : view.cssW / 2 + 24;
   let avail = Math.min(cx - colEdge, view.cssW - cx - 8, cy - 8, view.cssH - cy - 8);
   if (mode !== 'wide') avail = Math.min(avail, 1.6 * Rcss);
-  const maxOrbit = Math.max(1, ...bodiesFor(planet).map((b) => b.orbit), ...(planet.members || []).map((n) => (MEMBERS[n] ? MEMBERS[n].d + MEMBERS[n].r / PR : 1)));
+  const base = squeezeBase(planet.id);
+  const maxOrbit = Math.max(base, ringOuter(planet.id), ...bodiesFor(planet).map((b) => b.orbit + (b.r || 2) / PR), ...(planet.members || []).map((n) => (MEMBERS[n] ? MEMBERS[n].d + (MEMBERS[n].r * (MEMBERS[n].stretch || 1)) / PR : 1)));
   // rocks drift across the right half only (all of the screen on phones)
   const fx0 = mode === 'phone' ? 0 : (view.cssW / 2 + 16 - box.left) / box.k;
   fieldRange = [Math.max(0, fx0), Math.min(BUF, (view.cssW - box.left) / box.k)];
-  // the outermost orbit must fit in `avail`: Rcss * (1 + (maxOrbit - 1) * scale) <= avail
-  orbitScale = Math.min(1, Math.max(0.15, (avail / (Rcss * 1.06) - 1) / Math.max(0.01, maxOrbit - 1)));
+  // the outermost orbit must fit in `avail`: Rcss * (base + (maxOrbit - base) * scale) <= avail
+  orbitScale = Math.min(1, Math.max(0.15, (avail / (Rcss * 1.06) - base) / Math.max(0.01, maxOrbit - base)));
 }
 
 function loop() {
@@ -582,7 +809,8 @@ function loop() {
   cv.style.opacity = String(op);
   if (op > 0) {
     place(view);
-    render(reduceMotion ? 12 : 12 + (performance.now() - t0) / 1000, view);
+    lastT = reduceMotion ? 12 : 12 + (performance.now() - t0) / 1000;
+    render(lastT, view);
   }
   requestAnimationFrame(loop);
 }
@@ -598,7 +826,8 @@ solar.addEventListener('planet-close', () => { cv.style.opacity = '0'; });
 window.planetView = {
   stats: () => stats,                                                   // floating names this frame (for tests)
   orbitScale: () => orbitScale,
-  geometry: () => { if (!planet) return null; place(solar.solarView()); return geometry(); },
+  geometry: () => { if (!planet) return null; place(solar.solarView()); return geometry(lastT); },
+  geometryNow: () => (planet ? geometry(lastT) : null),                // the guides where they are this frame (Pluto moves)
   setObstacles: (rects) => { obstacles = rects || []; },
   members: () => lastMembers.map((m) => Object.assign({}, m)),        // the belt's named rocks right now (css px)
 };
