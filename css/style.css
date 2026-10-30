@@ -1,0 +1,836 @@
+:root {
+  --bg: #000;
+  --fg: #fff;
+  --accent: #ffd84a;
+  --edge-gap: clamp(1rem, 4vw, 3rem);
+  --content-gap: clamp(1.5rem, 4vw, 4rem);
+  --photo-w: min(30vw, calc((100vh - 2 * var(--edge-gap)) * 440 / 666));
+  --font: "Open Sauce Sans", system-ui, sans-serif;
+  --hand: "Gochi Hand", "Comic Sans MS", cursive;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+}
+
+.hero {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+}
+
+html {
+  background: var(--bg);        /* the root itself is black, so no white can show at a rounding gap or when overscrolling */
+  color-scheme: dark;
+  /* the browser's own snapping, as in the first version: every screen is a stop and the page never rests part-way.
+     The Hobbies screens sit in an overflow:clip box (not a scroll container), so they count as page-level stops. */
+  scroll-snap-type: y mandatory;
+}
+
+.hero,
+.hobbies-slide,
+.hobbies-tail {
+  scroll-snap-align: start;
+}
+
+.content {
+  position: absolute;
+  top: var(--edge-gap);
+  bottom: var(--edge-gap);
+  left: var(--edge-gap);
+  right: calc(var(--edge-gap) + var(--photo-w) + var(--content-gap));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  overflow: visible;           /* never an inner scroll area: it would swallow wheel events meant for the page */
+  text-align: center;
+}
+
+.name {
+  position: absolute;
+  top: var(--edge-gap);
+  left: var(--edge-gap);
+  margin: 0;
+  font-weight: 700;
+  font-size: clamp(1.33rem, 4vw, 3.56rem);
+  line-height: 0.95;
+  text-transform: lowercase;
+}
+
+.gravity {
+  width: 100%;
+  margin-top: clamp(1.5rem, 4vh, 3rem);
+}
+
+#gravity-canvas {
+  display: block;
+  width: 100%;
+  max-width: max(160px, min(640px, 100%, calc((100vh - 14rem) * 16 / 9)));   /* shrinks on short windows so the column fits */
+  margin: 0 auto;
+  aspect-ratio: 160 / 90;
+  image-rendering: pixelated;
+}
+
+#gravity-equation {
+  margin-top: 0.5rem;
+  font-size: clamp(1.1rem, 2vw, 1.75rem);
+  text-align: center;
+}
+
+#gravity-equation .katex-display {
+  margin: 0.4em 0;
+}
+
+.callout {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.callout path,
+.scroll-cue path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.callout-text,
+.scroll-cue-text {
+  color: var(--accent);
+  font-family: var(--hand);
+  font-weight: 400;
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.callout-text {
+  position: absolute;
+  transform: translate(-50%, -100%) rotate(-4deg);
+}
+
+.scroll-cue {
+  position: absolute;
+  left: var(--edge-gap);
+  bottom: var(--edge-gap);
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* bottom of the first screen, at the right of the left column (the scroll cue has the left) */
+.hero-tagline {
+  position: absolute;
+  right: calc(var(--edge-gap) + var(--photo-w) + var(--content-gap));
+  bottom: var(--edge-gap);
+  margin: 0;
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: clamp(1.09rem, 1.745vw, 1.636rem); /* 1.2x the first size, then 1.1x smaller */
+  line-height: 1.2;
+  white-space: nowrap;                          /* always one line */
+  color: var(--fg);
+  text-align: right;
+}
+
+/* phones: a little smaller, so the one line stays within the screen */
+@media (max-width: 700px) {
+  .hero-tagline { font-size: min(1.2rem, 4.2vw); }
+}
+
+/* a hand-drawn yellow squiggle under the whole line, stretched to its width */
+.tagline-squiggle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.12em);
+  width: 100%;
+  height: 0.45em;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.tagline-squiggle path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* a small, raised ordinal ("2nd") that does not push the line apart */
+.hero-tagline sup {
+  font-size: 0.6em;
+  line-height: 0;
+  vertical-align: 0.6em;
+}
+
+/* the scroll cue is a discreet hint, smaller than the equation */
+.scroll-cue-text {
+  font-size: clamp(1.5rem, 2.1vw, 1.875rem);
+  transform: rotate(-3deg);
+  transform-origin: left bottom;
+}
+
+.scroll-cue svg {
+  width: 30px;
+  height: 66px;
+  flex: none;
+  overflow: visible;
+}
+
+.scroll-cue path {
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.portrait {
+  position: absolute;
+  top: var(--edge-gap);
+  right: var(--edge-gap);
+  width: var(--photo-w);
+  height: calc(100vh - 2 * var(--edge-gap));
+  object-fit: cover;
+}
+
+/* ---- page 4: a blank canvas, one screen tall, black like the rest ---- */
+.page4 {
+  position: relative;
+  height: 100vh;
+  background: var(--bg);
+  scroll-snap-align: start;
+  overflow: clip;
+}
+
+/* the solar system sits behind everything else on page 4 */
+.solar-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.page4-hint,
+.page4-pluto,
+.page4-sun {
+  position: absolute;
+  z-index: 1;
+  bottom: var(--edge-gap);
+  margin: 0;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: clamp(0.55rem, min(1.1vw, 2vh), 0.95rem);
+  line-height: 1.4;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.page4-hint {
+  left: 50%;
+  translate: -50% 0;
+}
+
+.page4-pluto {
+  left: var(--edge-gap);
+}
+
+/* the two captions are links between the scenes (js/solar.js flies the camera between them) */
+.page4-pluto,
+.page4-sun {
+  text-decoration: none;
+}
+.page4-pluto:hover,
+.page4-sun:hover { color: #fff; }
+.page4-pluto:focus-visible,
+.page4-sun:focus-visible { outline: 2px dashed #fff; outline-offset: 4px; }
+
+.page4-sun {
+  right: var(--edge-gap);
+}
+
+.page4-text {
+  position: absolute;
+  z-index: 1;
+  top: var(--edge-gap);
+  left: var(--edge-gap);
+  max-width: calc(100% - 2 * var(--edge-gap));
+}
+
+.page4-title {
+  margin: 0;
+  text-align: left;
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: calc(clamp(1rem, min(4vw, 6.9vh), 3.56rem) * var(--bio-scale, 1));   /* same type as the other headings */
+  line-height: 1.12;
+  text-transform: lowercase;
+  color: var(--fg);
+}
+
+.page4-points {
+  max-width: min(100%, 60rem);
+  margin: 1.1em 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: calc(clamp(1.275rem, min(2.85vw, 5.4vh), 2.4rem) * var(--bio-scale, 1));   /* 1.5x the earlier size */
+  line-height: 1.3;
+  color: var(--fg);
+}
+
+.page4-points li {
+  position: relative;
+  padding-left: 1.1em;
+}
+
+.page4-points li + li {
+  margin-top: 0.7em;
+}
+
+.page4-points li::before {
+  content: "";
+  position: absolute;
+  left: 0.1em;
+  top: 0.6em;
+  width: 0.32em;
+  height: 0.32em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ---- hobbies scene: WebGL silicon wafer on a black page ---- */
+.hobbies {
+  --ink: #f3f1ec;      /* text on the black Hobbies page */
+  --navy: #8fa3ff;     /* the "navy" accent, lightened so it reads on black */
+  position: relative;
+  height: 200vh;               /* two screens: the wafer runs on from the first into the second */
+  overflow: clip;              /* clips the canvas to the section without making it a scroll container */
+  color: var(--ink);
+}
+
+/* screen 1: the text, links and note laid over the top of the wafer */
+.hobbies-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+}
+
+/* screen 2: nothing but black and the lower part of the wafer (this block only reserves the height) */
+.hobbies-tail {
+  position: absolute;
+  top: 100vh;
+  left: 0;
+  right: 0;
+  height: 100vh;
+}
+
+/* the HackerFab IITB logo, top-left of the last screen, with its link centred underneath */
+.hobbies-brand {
+  position: absolute;
+  top: var(--edge-gap);
+  /* centred between the page's left edge and the wafer's left end (js/brand.js sets --brand-cx / --brand-max) */
+  left: var(--brand-cx, calc(var(--edge-gap) + 7.125rem));
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6em;
+  width: min(clamp(7.5rem, min(16.5vw, 30vh), 14.25rem), var(--brand-max, 100vw));
+  font-size: clamp(1.05rem, min(2.7vw, 5vh), 2.25rem);   /* 1.5x the project links' size */
+}
+
+.hobbies-brand img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.hobbies-brand a {
+  font-family: var(--font);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.22em;
+  text-decoration-color: color-mix(in srgb, var(--ink) 45%, transparent);
+  transition: text-decoration-color 0.2s ease;
+}
+
+.hobbies-brand a:hover {
+  text-decoration-color: #f19bd8;
+}
+
+.hobbies-brand a:focus-visible {
+  outline: 2px solid #f19bd8;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.brand-arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.brand-arrow path {
+  fill: none;
+  stroke: #4f86ff;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brand-note {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: -50% -50%;
+  rotate: -4deg;
+  color: #4f86ff;
+  font-family: var(--hand);
+  font-size: clamp(1.4rem, min(2.8vw, 5vh), 2.4rem);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* the closing line, bottom-left of the last screen: same type as the heading above */
+.hobbies-closing {
+  position: absolute;
+  left: var(--edge-gap);
+  bottom: var(--edge-gap);
+  max-width: calc(100% - 2 * var(--edge-gap));
+  margin: 0;
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: clamp(1rem, min(4vw, 6.9vh), 3.56rem);
+  line-height: 1.12;
+  text-transform: lowercase;
+  color: var(--ink);
+}
+
+.wafer-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;                 /* faded in by js/scroll.js as the page eases to light */
+}
+
+.navy {
+  color: var(--navy);
+}
+
+.orange {
+  color: #ff8a3d;
+}
+
+.blue {
+  color: #4f86ff;
+}
+
+.purple {
+  color: #b57bff;
+}
+
+.hobbies-text {
+  position: absolute;
+  top: var(--edge-gap);
+  left: var(--edge-gap);
+  max-width: calc(100% - 2 * var(--edge-gap));
+}
+
+.hobbies-title {
+  width: fit-content;
+  margin: 0;
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: clamp(1rem, min(4vw, 6.9vh), 3.56rem);   /* same as the name in the hero on normal screens; shrinks on short windows */
+  line-height: 1.12;
+  text-transform: lowercase;
+  color: var(--ink);
+}
+
+.hobbies-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5em;
+  margin-top: 1.05em;
+  font-size: clamp(0.7rem, min(1.8vw, 3.3vh), 1.5rem);   /* the links' size; spacing above and between is in em */
+}
+
+.hobbies-links a {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 1em;
+  line-height: 1.2;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.22em;
+  text-decoration-color: color-mix(in srgb, var(--ink) 45%, transparent);
+  transition: text-decoration-color 0.2s ease;
+}
+
+.hobbies-links a:hover {
+  text-decoration-color: #f19bd8;
+}
+
+.hobbies-links a:focus-visible {
+  outline: 2px solid #f19bd8;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+/* handwritten note, bottom-left, with an arrow to the wafer */
+.hobbies-note {
+  position: absolute;
+  left: var(--edge-gap);
+  bottom: var(--edge-gap);
+  max-width: min(max(24vw, 9rem), 22rem);
+  margin: 0;
+  font-family: var(--hand);
+  font-size: clamp(0.7rem, min(1.7vw, 3vh), 1.5rem);
+  line-height: 1.25;
+  color: var(--navy);
+  rotate: -1.5deg;
+  transform-origin: left bottom;
+}
+
+.hobbies-note-arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.hobbies-note-arrow path {
+  fill: none;
+  stroke: var(--navy);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* the planet close-up: sits above the overview canvas, below the text, and fades in over the last part of the zoom */
+.planet-canvas {
+  position: absolute;
+  z-index: 1;
+  display: block;
+  opacity: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+/* ---- planet buttons: invisible, one over each planet; a pixel-style dashed ring shows keyboard focus ---- */
+.planet-buttons {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.planet-btn {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.planet-btn.is-keyboard { pointer-events: none; }   /* the Sun's and the belt's: for the keyboard; the mouse uses the canvas hit test */
+
+.planet-btn:focus-visible {
+  outline: 2px dashed #fff;
+  outline-offset: 2px;
+}
+
+/* ---- the bio in a planet view: it stays, narrowing to the left half in step with the zoom (js/solar.js sets its width
+   and --bio-scale every frame, so its lines rewrap as it goes) ---- */
+.page4-scroll { display: contents; }
+
+.page4-hint { transition: opacity 0.3s ease; }
+.page4.planet-open .page4-hint { opacity: 0; pointer-events: none; }   /* it would sit under the fun fact */
+
+/* ---- the planet's facts (js/planet-callouts.js): pixel text, no boxes; a 1 px black pixel outline keeps it readable ---- */
+.planet-info {
+  --co-scale: 1;
+  --co-dim: #a4a7bb;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-weight: 400;
+  color: #f4f4f8;
+  text-transform: uppercase;
+  text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000, 1px 1px #000, -1px -1px #000, 1px -1px #000, -1px 1px #000;
+}
+
+.planet-head,
+.planet-callout { pointer-events: auto; }
+
+.planet-head {
+  position: absolute;
+  top: 48px;
+  left: calc(50% + 24px);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.planet-info.is-active .planet-head { opacity: 1; transition: opacity 0.3s ease 0.3s; }
+
+.planet-back {
+  display: inline-block;
+  font-size: calc(12px * var(--co-scale));
+  line-height: 1.6;
+  color: var(--co-dim);
+  text-decoration: none;
+}
+.planet-back:hover { color: #fff; }
+.planet-back:focus-visible { outline: 2px dashed #fff; outline-offset: 4px; }
+
+.planet-name {
+  margin: calc(8px * var(--co-scale)) 0 0;
+  font-size: calc(32px * var(--co-scale));
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.planet-callouts {
+  position: absolute;
+  inset: 0;
+}
+
+.planet-callout {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  max-width: calc(272px * var(--co-scale));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+/* after the zoom: the leader lines draw out, then the callouts fade in one after another, 80 ms apart */
+.planet-info.is-revealed .planet-callout { opacity: 1; transition: opacity 0.3s ease calc(250ms + var(--i, 0) * 80ms); }
+
+.planet-callout dt,
+.pc-label {
+  margin: 0;
+  font-size: calc(12px * var(--co-scale));
+  line-height: 1.6;
+  color: var(--co-dim);
+}
+.planet-callout dd { margin: 0; }
+.pc-value { font-size: calc(16px * var(--co-scale)); line-height: 1.6; }
+.pc-note { font-size: calc(12px * var(--co-scale)); line-height: 1.6; color: #d2d3de; }
+.planet-callout.is-inline dt,
+.planet-callout.is-inline dd { display: inline; }
+.planet-callout.is-inline dd { margin-left: 0.6em; font-size: calc(16px * var(--co-scale)); }
+
+.pc-fact {
+  width: max-content;
+  max-width: var(--fact-w, 45ch);
+  text-align: center;
+}
+.pc-text {
+  margin: 0;
+  font-size: calc(16px * var(--co-scale));
+  line-height: 1.7;
+}
+
+.planet-leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.planet-leaders line {
+  stroke: rgba(228, 230, 242, 0.8);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 0.15s linear;
+}
+.planet-info.is-revealed .planet-leaders line { stroke-dashoffset: 0; transition: stroke-dashoffset 0.25s ease-out; }
+
+/* more than five moons: "+N more" drops the rest down over a dark pixel panel */
+.pc-more { position: relative; }
+.moons-toggle {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: calc(12px * var(--co-scale));
+  line-height: 1.6;
+  color: #8fa3ff;
+  text-transform: inherit;
+  text-shadow: inherit;
+  cursor: pointer;
+}
+.moons-toggle:hover { color: #c4cfff; }
+.moons-toggle:focus-visible { outline: 2px dashed #fff; outline-offset: 3px; }
+.moons-more {
+  position: absolute;
+  z-index: 2;
+  top: 100%;
+  left: -8px;
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  list-style: none;
+  font-size: calc(16px * var(--co-scale));
+  line-height: 1.6;
+  white-space: nowrap;
+  background: #06060b;
+  box-shadow: 0 0 0 2px #2c2e40, 4px 4px 0 2px #000;
+  clip-path: inset(0 0 100% 0);
+  visibility: hidden;
+  transition: clip-path 0.25s steps(6), visibility 0s linear 0.25s;
+}
+.moons-more.is-open { clip-path: inset(0 -8px -8px -8px); visibility: visible; transition: clip-path 0.25s steps(6), visibility 0s; }
+
+/* 768 to 1099 px (and wide screens too short for callouts): a plain list in two columns under the planet */
+.planet-info[data-mode="list"] .planet-callouts {
+  inset: auto 48px auto calc(50% + 24px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(14px * var(--co-scale)) calc(24px * var(--co-scale));
+  align-content: start;
+}
+.planet-info[data-mode="list"] .planet-callout,
+.planet-info[data-mode="phone"] .planet-callout { position: static; max-width: none; }
+.planet-info[data-mode="list"] .pc-fact,
+.planet-info[data-mode="phone"] .pc-fact { grid-column: 1 / -1; width: auto; max-width: 45ch; text-align: left; }
+
+/* in the lists, the moon names share one line */
+.planet-info[data-mode="list"] .pc-a-moons .pc-value,
+.planet-info[data-mode="phone"] .pc-a-moons .pc-value { display: inline; }
+.planet-info[data-mode="list"] .pc-a-moons .pc-value + .pc-value::before,
+.planet-info[data-mode="phone"] .pc-a-moons .pc-value + .pc-value::before { content: ", "; }
+
+@media (prefers-reduced-motion: reduce) {
+  .planet-head, .planet-callout, .planet-leaders line, .moons-more, .page4-hint { transition: none !important; }
+}
+
+@media (max-width: 767px) {
+  /* phones: the planet at the top, then one scrolling column with the facts and then the bio */
+  .page4-text { transition: opacity 0.3s ease 0.2s; }
+  .page4.planet-open .page4-text { opacity: 0; transition: opacity 0.2s ease; }
+  .page4.planet-open.planet-shown .page4-text { position: static; max-width: none; margin-top: 2.6rem; opacity: 1; transition: opacity 0.3s ease 0.25s; }
+  .page4.planet-shown .page4-scroll {
+    display: block;
+    position: absolute;
+    z-index: 3;
+    top: var(--info-top, 60vw);
+    left: var(--edge-gap);
+    right: var(--edge-gap);
+    bottom: 0;
+    padding-bottom: var(--edge-gap);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+  .page4.planet-shown .planet-info { position: static; }
+  .page4.planet-shown .page4-pluto,
+  .page4.planet-shown .page4-sun { opacity: 0; }
+  .planet-info[data-mode="phone"] .planet-head { position: static; opacity: 0; }
+  .planet-info[data-mode="phone"].is-revealed .planet-head { opacity: 1; }
+  .planet-info[data-mode="phone"] .planet-callouts {
+    position: static;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 16px;
+  }
+}
+
+@media (max-width: 700px) {
+  html {
+    scroll-snap-type: y proximity;   /* the stacked hero is taller than the screen: let it scroll freely, snap only when close */
+  }
+
+  .hero {
+    height: auto;
+    padding: var(--edge-gap);
+  }
+
+  .content,
+  .portrait,
+  .name,
+  .hero-tagline {
+    position: static;
+  }
+
+  .hero-tagline {
+    position: relative;          /* holds the squiggle */
+    right: auto;
+    width: fit-content;          /* so the squiggle is as wide as the words */
+    margin-top: var(--edge-gap);
+    text-align: left;
+  }
+
+  .content {
+    overflow: visible;
+  }
+
+  .callout,
+  .callout-text,
+  .scroll-cue {
+    display: none;
+  }
+
+  .portrait {
+    width: 100%;
+    height: auto;
+    margin-top: var(--edge-gap);
+  }
+
+  /* page 4 on a phone: the two captions would collide side by side, so stack them */
+  .page4-hint {
+    left: var(--edge-gap);
+    translate: none;
+    bottom: calc(var(--edge-gap) + 2.4em);
+  }
+}

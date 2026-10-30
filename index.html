@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rushat Dixit</title>
+  <meta name="description" content="Rushat Dixit: things I've built.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23000'/%3E%3Ccircle cx='16' cy='16' r='8' fill='%23f19bd8'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/open-sauce-sans/700.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/gochi-hand/400.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/press-start-2p/400.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="css/style.css?v=77">
+  <script src="js/wafer.js?v=77" defer></script>
+  <script src="js/note.js?v=77" defer></script>
+  <script src="js/brand.js?v=77" defer></script>
+  <script src="js/scroll.js?v=77" defer></script>
+  <script src="js/callout.js?v=77" defer></script>
+  <script src="js/gravity.js?v=77" defer></script>
+  <script src="js/backgrounds.js?v=77" defer></script>
+  <script src="js/bodies.js?v=77" defer></script>
+  <script src="js/solar.js?v=77" defer></script>
+  <script src="js/planet-view.js?v=77" defer></script>
+  <script src="js/planet-callouts.js?v=77" defer></script>
+  <!-- KaTeX comes from a CDN, so it goes last: a slow CDN must not hold up anything above (gravity.js typesets once the page has loaded) -->
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <h1 class="name">Rushat Dixit</h1>
+      <div class="content">
+        <section class="gravity">
+          <canvas id="gravity-canvas" width="160" height="90" role="img" aria-label="Pixelated animation of the moon orbiting the earth, with gravitational force vectors"></canvas>
+          <div id="gravity-equation"></div>
+        </section>
+      </div>
+      <img class="portrait" src="images/me.jpg" alt="Portrait of me">
+      <svg class="callout" aria-hidden="true">
+        <path class="callout-line"/>
+        <path class="callout-head"/>
+      </svg>
+      <span class="callout-text" aria-hidden="true">this is him!</span>
+      <p class="hero-tagline">2<sup>nd</sup> year, BTech MEMS Dept. @ <span class="blue">IIT Bombay</span><svg class="tagline-squiggle" viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path d="M2,6 Q7.1,2.3 12.2,5.9 Q17.2,9.7 22.2,5.9 Q28.3,1.4 34.4,6.3 Q39.5,10.2 44.6,5.7 Q49.6,2.3 54.6,5.7 Q60.8,10.6 66.9,6.4 Q72.8,2.2 78.8,5.8 Q84.5,10.5 90.2,6.4 Q96.2,2.3 102.3,6.1 Q108.1,10.2 113.8,5.6 Q119.3,2.3 124.8,6.5 Q130.8,10.3 136.8,5.8 Q143.0,1.7 149.1,6.5 Q155.1,10.2 161.1,5.9 Q166.8,1.9 172.4,5.6 Q177.6,10.6 182.8,5.5 Q187.7,1.6 192.5,5.7 Q198.0,10.2 203.6,5.8 Q209.8,2.2 216.1,5.9 Q221.1,10.4 226.2,5.7 Q231.5,1.5 236.7,5.8 Q242.3,10.7 247.9,5.5 Q252.8,2.1 257.6,6.3 Q263.3,9.9 268.9,5.8 Q274.0,1.8 279.0,5.5 Q284.8,10.7 290.6,6.5 Q294.3,1.2 298.0,5.4"/></svg></p>
+      <a class="scroll-cue" href="#hobbies">
+        <span class="scroll-cue-text">to learn more..</span>
+        <svg viewBox="0 0 60 132" aria-hidden="true">
+          <path d="M20,6 C8,30 36,48 22,72 C16,86 26,100 26,120"/>
+          <path d="M26,120 L15.4,103 M26,120 L35.6,104.6"/>
+        </svg>
+      </a>
+    </section>
+    <section class="hobbies" id="hobbies">
+      <canvas class="wafer-canvas" aria-hidden="true"></canvas>
+      <div class="hobbies-slide">
+        <svg class="hobbies-note-arrow" aria-hidden="true">
+          <path class="note-line"/>
+          <path class="note-head"/>
+        </svg>
+        <p class="hobbies-note">the dazzling rainbowy colors of the silicon wafer are caused by a thin film of SiO<sub>2</sub> which is grown on it using a tube furnace!</p>
+        <div class="hobbies-text">
+          <h2 class="hobbies-title">I love <span class="navy">building</span>.<br>Here are some things I’ve built:</h2>
+          <nav class="hobbies-links" aria-label="Projects">
+            <a href="https://docs.hackerfabiitb.org/tube-furnace" target="_blank" rel="noopener noreferrer">tube furnace</a>
+            <a href="https://github.com/rushatdixit/damArea" target="_blank" rel="noopener noreferrer">damArea</a>
+            <a href="https://github.com/rushatdixit/electrostatics_but_interactable" target="_blank" rel="noopener noreferrer">electrostatics simulator</a>
+          </nav>
+        </div>
+      </div>
+      <div class="hobbies-tail">
+        <div class="hobbies-brand">
+          <img src="images/hackerfab-iitb-logo.png" alt="HackerFab IITB logo">
+          <a href="https://hackerfabiitb.org" target="_blank" rel="noopener noreferrer">our website</a>
+        </div>
+        <!-- saved earlier version: I’m building <span class="orange">hackerfab india</span> - we’re making semiconductor fabrication open-source and accessible to indian students -->
+        <svg class="brand-arrow" aria-hidden="true">
+          <path class="brand-line"/>
+          <path class="brand-head"/>
+        </svg>
+        <span class="brand-note" aria-hidden="true">check it out!</span>
+        <h2 class="hobbies-closing">I’m a part of <span class="blue">hackerfab iitb</span> - we’re india’s first student-led semiconductor fabrication lab</h2>
+      </div>
+    </section>
+    <section class="page4" id="page4">
+      <canvas class="solar-canvas" role="img" aria-label="Pixel-art model of the solar system"></canvas>
+      <!-- on phones, while a planet is open, this becomes one scrolling column: the planet facts, then the bio -->
+      <div class="page4-scroll">
+        <div class="page4-text">
+          <h2 class="page4-title">More about me:</h2>
+          <ul class="page4-points">
+            <li>building <span class="orange">hackerfab india</span> - we’re making semiconductor fabrication open-source and accessible to indian students</li>
+            <li>interested in <span class="purple">semiconductors</span>, especially packaging</li>
+            <li>i love modelling <span class="blue">physics</span></li>
+          </ul>
+        </div>
+      </div>
+      <p class="page4-hint">try clicking things!</p>
+      <a class="page4-pluto" href="#outer">&lt;- towards pluto</a>
+      <a class="page4-sun" href="#" hidden>towards the sun -&gt;</a>
+    </section>
+  </main>
+</body>
+</html>
