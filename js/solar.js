@@ -467,12 +467,16 @@ function planetState(i, phi) {
 // each planet: its angle on its orbit, and what it is doing: 'moving' (on screen, at its speed), 'waiting' (wholly hidden
 // just before the point where it comes back into view, until `wait`), 'emerging' (moving at its speed towards that point)
 // or 'parked' (no part of its orbit is on screen from here; looked at again every second). simT is the running time the
-// waits are measured on.
-const motion = BODIES.map((b) => ({ phi: (b.start * Math.PI) / 180, state: 'moving', wait: 0, since: 0, on: false, aimedAt: 0 }));
+// waits are measured on; `out` is when it comes (or came) out and ex, ey where (css px, y down the page), so planets coming in
+// over the same stretch of edge are spaced out instead of arriving together.
+const motion = BODIES.map((b) => ({ phi: (b.start * Math.PI) / 180, state: 'moving', wait: 0, since: 0, on: false, aimedAt: 0,
+  out: -Infinity, ex: 0, ey: 0 }));
 let simT = 0, labelOff = [];                 // labelOff[i]: planet i's name as drawn last frame, relative to it (art px)
 let seedM = 7;
 const randM = () => (seedM = (seedM * 1664525 + 1013904223) >>> 0) / 4294967296;
 const REENTER_WAIT = [3, 6];                 // seconds a hidden planet waits before coming back out
+const ENTRY_GAP = [5, 9];                    // ... and at least this long after another planet comes out near the same spot
+const ENTRY_NEAR = 0.35;                     // "near": entry points within this share of the window's diagonal
 const EMPTY_WAIT = 0.8;                      // ... or at most this long when no planet at all is on screen
 
 // how far round a planet its moons (or Saturn's rings) reach, in art px
@@ -522,10 +526,29 @@ function entryAhead(i, phi) {
   return null;
 }
 const reenterWait = () => REENTER_WAIT[0] + (REENTER_WAIT[1] - REENTER_WAIT[0]) * randM();
+const entryGap = () => ENTRY_GAP[0] + (ENTRY_GAP[1] - ENTRY_GAP[0]) * randM();
+// planet i goes to entry point e (unseen): remember where on screen that is
+function aimAt(i, e) {
+  const m = motion[i], bx = bodyBox(i, e, false);
+  m.phi = e; m.ex = (bx.left + bx.right) / 2; m.ey = (bx.top + bx.bottom) / 2 + window.scrollY; m.aimedAt = window.scrollY;
+}
+// when planet i (waiting at its entry point) comes out, no sooner than `from`: a gap after any other planet that comes
+// out near the same spot, so the concentric outer orbits don't send their planets in side by side
+function schedule(i, from) {
+  const m = motion[i], near = ENTRY_NEAR * Math.hypot(window.innerWidth, window.innerHeight);
+  const others = motion.filter((o, j) => j !== i && (o.state === 'waiting' || o.out > simT - ENTRY_GAP[1]) && Math.hypot(o.ex - m.ex, o.ey - m.ey) < near);
+  let t = from;
+  for (let pass = 0, moved = true; moved && pass < 12; pass++) {
+    moved = false;
+    for (const o of others) if (Math.abs(t - o.out) < ENTRY_GAP[0]) { t = o.out + entryGap(); moved = true; }
+  }
+  return t;
+}
 // one step of the motion rules (the camera at rest, no close-up open):
 //  - a planet that is even partly on screen always moves at its own speed: nothing visible is ever sped up
 //  - one that has gone wholly out of view jumps at once (unseen) to just before its next entry point, waits REENTER_WAIT,
-//    then moves out at its speed, from behind the wafer or a screen edge, wherever its orbit comes back into view
+//    then moves out at its speed, from behind the wafer or a screen edge, wherever its orbit comes back into view; one
+//    coming in near where another just did (or is about to) waits ENTRY_GAP longer, so they arrive one at a time
 //  - when no planet is on screen at all, the one due soonest comes out within EMPTY_WAIT
 function stepPlanets(dt) {
   simT += dt;
@@ -537,8 +560,9 @@ function stepPlanets(dt) {
     if ((m.state === 'waiting' || m.state === 'emerging') && !m.on && Math.abs(window.scrollY - m.aimedAt) > 1) {
       const e = entryAhead(i, m.phi);
       if (e === null) { m.state = 'parked'; m.wait = simT + 1; return; }
-      m.phi = e; m.aimedAt = window.scrollY;
-      if (m.state === 'emerging') m.since = simT;
+      aimAt(i, e);
+      if (m.state === 'emerging') { m.since = simT; m.out = simT; }
+      else m.wait = m.out = schedule(i, m.wait);
     }
     if (m.state === 'parked') {
       if (m.on) m.state = 'moving';
@@ -546,29 +570,29 @@ function stepPlanets(dt) {
         if (simT < m.wait) return;
         const e = entryAhead(i, m.phi);
         if (e === null) { m.wait = simT + 1; return; }
-        m.phi = e; m.state = 'waiting'; m.wait = simT + reenterWait(); m.aimedAt = window.scrollY; labelOff[i] = null;
+        aimAt(i, e); m.state = 'waiting'; m.wait = m.out = schedule(i, simT + reenterWait()); labelOff[i] = null;
         return;
       }
     }
     if (m.state === 'waiting') {
       if (m.on) m.state = 'moving';                          // in view (the screen moved under it): never stand still
       else if (simT < m.wait) return;
-      else { m.state = 'emerging'; m.since = simT; }
+      else { m.state = 'emerging'; m.since = m.out = simT; }
     }
     if (m.state === 'emerging' && m.on) m.state = 'moving';
     if (m.state === 'moving' && !m.on) {                     // just went wholly out of view: jump ahead (unseen) and wait
       const e = entryAhead(i, m.phi);
       if (e === null) { m.state = 'parked'; m.wait = simT + 1; return; }
-      m.phi = e; m.state = 'waiting'; m.wait = simT + reenterWait(); m.aimedAt = window.scrollY; labelOff[i] = null;   // (its old name spot no longer applies)
+      aimAt(i, e); m.state = 'waiting'; m.wait = m.out = schedule(i, simT + reenterWait()); labelOff[i] = null;   // (its old name spot no longer applies)
       return;
     }
     if (m.state === 'emerging' && simT - m.since > 3) { m.state = 'moving'; return; }   // the view changed under it: look again
     m.phi += angleFor(i, m.phi, b.speed * dt);
   });
-  if (!anyOn) {                                              // nothing on screen: bring the next one out within a second
+  if (!anyOn && !motion.some((m) => m.state === 'emerging')) {   // nothing on screen or on its way: bring the next one out
     let next = null;
     for (const m of motion) if (m.state === 'waiting' && (!next || m.wait < next.wait)) next = m;
-    if (next && next.wait > simT + EMPTY_WAIT) next.wait = simT + EMPTY_WAIT;
+    if (next && next.wait > simT + EMPTY_WAIT) next.wait = next.out = simT + EMPTY_WAIT;
   }
 }
 // reduced motion: nothing moves, so a planet that is hidden is placed in the middle of the longest stretch of its orbit
@@ -1823,6 +1847,7 @@ canvas.planetPositions = () => placed.map((p, i) => ({
 canvas.solarBodies = () => BODIES.map((b, i) => {
   const bx = bodyBox(i), m = motion[i];
   return { name: b.name, speed: b.speed, state: m.state, waitLeft: m.state === 'waiting' ? m.wait - simT : 0, phi: m.phi, onScreen: isOnScreen(i),
+    out: m.out - simT, entry: [m.ex, m.ey],
     box: { left: bx.left, right: bx.right, top: bx.top, bottom: bx.bottom }, x: bx.p.sx * (lay.w / W), y: (bx.p.sy + TOP) * (lay.h / BH) + lay.top - window.scrollY };
 });
 // run the motion rules for dt seconds (in small steps) and draw, without waiting for real time (tests)
