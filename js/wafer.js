@@ -1,12 +1,13 @@
-/* Silicon wafer for the Hobbies section: a WebGL2 ray-cast wafer with a cursor-following
- * iridescent sheen. The canvas is SPAN screens tall, so the wafer runs on from the first screen into
- * the second. (wafer.html is an older, single-screen standalone preview of the same idea; it is not
+/* Silicon wafer for the hackerfab section: a WebGL2 ray-cast wafer with a cursor-following
+ * iridescent sheen. The camera frames a box at the top of the section whose height follows the page width
+ * (FRAME_ASPECT), so the wafer sits top-right at the same size relative to the width on any screen; the canvas
+ * covers the whole section, however tall its text makes it. (wafer.html is an older, single-screen standalone preview of the same idea; it is not
  * kept in sync with this file.) Tune the look with the constants below. */
 (() => {
 /* ------------------------------------------------------------------ *
  *  Tuning
  * ------------------------------------------------------------------ */
-const SPAN          = 2;         // the canvas is this many screens tall: screen 1 frames the top of the wafer, screen 2 shows the rest
+const FRAME_ASPECT  = 1.6;       // the framed box at the top of the section: width / height (the canvas runs on below it)
 const GLOW_RADIUS   = 0.65;      // core-to-halo radius in wafer radii; the fringe fades out by ~1.9x this
 const EASE          = 0.10;      // glow lerp per frame toward the cursor (0.08-0.12 feels floaty)
 const FADE          = 0.07;      // glow in/out speed when entering or leaving the wafer
@@ -18,8 +19,9 @@ const ATTRACT_TILT  = 3;         // degrees the wafer leans toward the cursor ve
 const ATTRACT_YAW   = 3;         // degrees the wafer leans toward the cursor horizontally
 const ATTRACT_EASE  = 0.045;     // how softly the wafer follows (lower = lazier)
 const FOV           = 34;        // vertical field of view, degrees (lower = flatter perspective)
-const WAFER_CENTER  = [0.66, -0.28]; // wafer centre as a fraction of the half-viewport (x right, y up)
-const WAFER_RADIUS  = 1.75;      // wafer radius in half-viewport heights at the wafer's distance
+const WAFER_CENTER  = [1.016, 0.669]; // wafer centre as a fraction of the framed box's half-size (x right, y up): top-right, its
+                                     // left edge about 57% across and its lowest point about 0.42 widths below the top
+const WAFER_RADIUS  = 1.4;       // wafer radius in half-box heights at the wafer's distance
 const DIE_SIZE      = [0.046, 0.040]; // die pitch (x, y) in wafer radii, a 1.15:1 die (~43 across)
 
 const COLOR_CORE    = '#a6e4ea'; // tiny pale-aqua core
@@ -45,8 +47,8 @@ precision highp float;
 out vec4 outColor;
 
 uniform vec2  uRes;
-uniform float uSpan;               // screens the canvas spans
-uniform float uAspect;             // width / height of ONE screen
+uniform float uSpan;               // the canvas height in framed boxes
+uniform float uAspect;             // width / height of the framed box
 uniform float uTan;
 uniform vec3  uC, uU, uV, uN;      // wafer centre and plane basis (camera space)
 uniform float uR;                  // wafer radius (camera-space units)
@@ -94,7 +96,7 @@ vec3 lit(vec3 rest, float x, float sat, float k) {
 
 void main() {
   vec2 ndc = gl_FragCoord.xy / uRes * 2.0 - 1.0;
-  ndc.y = uSpan * (ndc.y - 1.0) + 1.0;     // the canvas spans several screens; the camera frames the top one
+  ndc.y = uSpan * (ndc.y - 1.0) + 1.0;     // the camera frames the box at the top of the canvas
   ndc.x *= uAspect;
   vec3 d = normalize(vec3(ndc * uTan, -1.0));
 
@@ -172,7 +174,7 @@ const hex = (s) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16) / 255);
 const rad = (d) => (d * Math.PI) / 180;
 const TAN = Math.tan(rad(FOV) / 2);
 
-let W = 1, H = 1, aspect = 1;
+let W = 1, H = 1, aspect = FRAME_ASPECT, span = 1;   // span: the canvas height in framed boxes (fractional)
 const pos = { left: 0, top: 0, width: 1, height: 1 };   // the canvas in document px (set on resize)
 const att = { x: 0, y: 0 };            // eased lean of the wafer toward the cursor
 let edgePts = [];                      // resting outline in canvas px, for things that point at the wafer
@@ -190,7 +192,7 @@ function buildPlane(ax = 0, ay = 0) {
   plane.V = yaw(mixv(U0, V0, -Math.sin(ph), Math.cos(ph)));
   plane.N = yaw(N);
   plane.C = [(WAFER_CENTER[0] + ax * ATTRACT_SHIFT + dropX) * aspect * TAN, (WAFER_CENTER[1] + ay * ATTRACT_SHIFT + dropY) * TAN, -1];
-  plane.R = WAFER_RADIUS * TAN * Math.max(1, 1.35 / aspect);
+  plane.R = WAFER_RADIUS * TAN;
 }
 
 // pointer (aspect-scaled NDC) -> wafer coordinates, or null above the horizon
@@ -246,7 +248,7 @@ function resize() {
   H = Math.max(1, Math.round(canvas.clientHeight * dpr));
   canvas.width = W;
   canvas.height = H;
-  aspect = canvas.clientWidth / (canvas.clientHeight / SPAN);       // aspect of one screen
+  span = Math.max(1e-3, canvas.clientHeight / frameH());
   fitAroundText();
   buildPlane(0, 0);
   edgePts = outlinePx();
@@ -259,7 +261,7 @@ function resize() {
     gl.clearColor(0, 0, 0, 0);
     gl.viewport(0, 0, W, H);
     gl.uniform2f(loc.uRes, W, H);
-    gl.uniform1f(loc.uSpan, SPAN);
+    gl.uniform1f(loc.uSpan, span);
     gl.uniform1f(loc.uAspect, aspect);
     uploadPlane();
   }
@@ -274,7 +276,7 @@ function outlinePx() {
     const P = [0, 1, 2].map((k) => plane.C[k] + plane.R * (u * plane.U[k] + v * plane.V[k]));
     if (P[2] >= 0) continue;
     const nx = P[0] / -P[2] / TAN, ny = P[1] / -P[2] / TAN;
-    pts.push({ x: ((nx / aspect + 1) / 2) * canvas.clientWidth, y: ((1 - ny) / 2) * (canvas.clientHeight / SPAN) });
+    pts.push({ x: ((nx / aspect + 1) / 2) * canvas.clientWidth, y: ((1 - ny) / 2) * frameH() });
   }
   return pts;
 }
@@ -292,30 +294,27 @@ canvas.waferOutline = () => edgePts.map((p) => ({ x: p.x, y: p.y }));
 // x (canvas px) of the wafer's left end: the leftmost point of the resting outline
 canvas.waferLeft = () => (edgePts.length ? Math.min(...edgePts.map((p) => p.x)) : null);
 
-// Keep the wafer clear of the text, at any window size or zoom level. Measured on the resting pose:
-//  - top-left text (the heading and each link): the wafer is lowered until its highest outline point
-//    left of an element's right edge sits below that element's bottom plus a gap;
-//  - the bottom-left note: the wafer is pushed right until its left edge, over the note's height,
-//    sits right of the note plus a gap (wide enough to leave room for the arrow).
-// Only as much movement as needed is applied, so on a roomy window nothing moves.
+// the framed box's height in css px: it follows the width, so the wafer keeps its place and size relative to the page width
+const frameH = () => Math.max(1, canvas.clientWidth / FRAME_ASPECT);
+
+// Keep the wafer clear of the logo block (logo, "our website", "check it out!" and its arrow) at the top-left, at any
+// width: measured on the resting pose, the wafer is pushed right until its left edge, over the block's height, sits right
+// of the block plus a gap. Only as much as needed, so on a roomy window nothing moves. (The headline below is kept clear
+// of the wafer the other way round: js/brand.js moves it down.)
 function fitAroundText() {
   dropY = 0;
   dropX = 0;
-  const cw = canvas.clientWidth, ch = canvas.clientHeight / SPAN;   // one screen
-  if (!cw || !ch) return;
-  const block = document.querySelector('.hobbies-text');
-  const note = document.querySelector('.hobbies-note');
-  const spans = block ? [...block.querySelectorAll('.hobbies-title, .hobbies-links a')].map((el) => ({
-    bottom: (block.offsetTop + el.offsetTop + el.offsetHeight + 0.035 * ch) / ch,
-    right: (block.offsetLeft + el.offsetLeft + el.offsetWidth + 0.02 * cw) / cw,
-  })) : [];
-  const noteBox = note && note.offsetParent !== null ? {
-    top: (note.offsetTop - 0.03 * ch) / ch,
-    bottom: (note.offsetTop + note.offsetHeight + 0.03 * ch) / ch,
-    need: (note.offsetLeft + note.offsetWidth + Math.max(70, 0.07 * cw)) / cw,
+  const cw = canvas.clientWidth, ch = frameH();
+  if (!cw) return;
+  const block = document.querySelector('.hf-brand');
+  const box = block && block.offsetParent !== null ? {
+    top: (block.offsetTop - 0.02 * cw) / ch,
+    bottom: (block.offsetTop + block.offsetHeight + 0.02 * cw) / ch,
+    need: (block.offsetLeft + block.offsetWidth + 0.03 * cw) / cw,
   } : null;
+  if (!box) return;
 
-  // outline points as screen fractions
+  // outline points as fractions of the framed box
   const outline = () => {
     const pts = [];
     for (let i = 0; i < 1440; i++) {
@@ -329,26 +328,10 @@ function fitAroundText() {
 
   for (let iter = 0; iter < 8; iter++) {
     buildPlane(0, 0);
-    let pts = outline();
-    let worstY = 0;
-    for (const s of spans) {
-      let y = Infinity;
-      for (const [x, py] of pts) if (x <= s.right) y = Math.min(y, py);
-      worstY = Math.max(worstY, s.bottom - y);
-    }
-    if (worstY > 0) {
-      dropY -= worstY * 2;                   // NDC y spans two units top to bottom
-      buildPlane(0, 0);
-      pts = outline();
-    }
-    let worstX = 0;
-    if (noteBox) {
-      let x = Infinity;
-      for (const [px, py] of pts) if (py >= noteBox.top && py <= noteBox.bottom) x = Math.min(x, px);
-      if (x < noteBox.need) worstX = noteBox.need - x;
-    }
-    if (worstX > 0) dropX += worstX * 2;     // centre x is a fraction of the half-width
-    if (worstY <= 0 && worstX <= 0) break;
+    let x = Infinity;
+    for (const [px, py] of outline()) if (py >= box.top && py <= box.bottom) x = Math.min(x, px);
+    if (!(x < box.need)) break;
+    dropX += (box.need - x) * 2;             // centre x is a fraction of the half-width
   }
   buildPlane(0, 0);
 }
@@ -395,8 +378,8 @@ addEventListener('blur', leave);
 
 // idle: a slow Lissajous path over the visible part of the wafer
 function idle(t) {
-  const nx = (0.05 + 0.34 * Math.sin(t * 0.37)) * aspect;
-  const ny = -0.12 + 0.30 * Math.sin(t * 0.29 + 1.1);
+  const nx = (0.62 + 0.26 * Math.sin(t * 0.37)) * aspect;
+  const ny = 0.42 + 0.28 * Math.sin(t * 0.29 + 1.1);
   const w = toWafer(nx, ny);
   if (w) { target.x = w[0]; target.y = w[1]; }
   energyTarget = 1;
@@ -417,7 +400,7 @@ function frame(now) {
     ptr.ax = (ptr.cx - left) / pos.width * 2 - 1;
     const cay = -((ptr.cy - top) / pos.height * 2 - 1);            // -1..1 over the whole tall canvas
     ptr.nx = ptr.ax * aspect;
-    ptr.ny = SPAN * (cay - 1) + 1;                                  // same mapping the shader uses
+    ptr.ny = span * (cay - 1) + 1;                                  // same mapping the shader uses
     ptr.ay = Math.max(-1, Math.min(1, ptr.ny));                     // for the wafer's lean
     if (Math.abs(ptr.ax) > 1 || Math.abs(cay) > 1) live = false;
   }
@@ -457,7 +440,7 @@ function frame(now) {
       energyTarget = 0;
     }
   } else if (reduceMotion) {                  // no drift: rest the light at a fixed spot
-    const w = toWafer(0.05 * aspect, -0.12);
+    const w = toWafer(0.62 * aspect, 0.42);
     if (w) { target.x = light.x = w[0]; target.y = light.y = w[1]; }
     energyTarget = 1;
   } else {

@@ -1207,7 +1207,7 @@ function measureText() {
       if (viewMode() === 'phone' && page.classList.contains('planet-shown') && n.parentElement.closest('.page4-pluto, .page4-sun')) continue;
       const range = document.createRange();
       range.selectNodeContents(n);
-      const blk = perBlock && (n.parentElement.closest('.hobbies-closing, .hobbies-brand a, .brand-note') || n.parentElement);
+      const blk = perBlock && (n.parentElement.closest('.hf-headline, .hf-brand-text a, .brand-note, .hf-body p, .hobbies-note') || n.parentElement);
       for (const r of range.getClientRects()) {
         rects.push(r);
         if (blk) { if (!blocks.has(blk)) blocks.set(blk, []); blocks.get(blk).push(r); continue; }
@@ -1216,12 +1216,12 @@ function measureText() {
     }
   };
   walk(page);
-  // the hackerfab screen's text sits over this canvas too: the heading, "our website" and "check it out!" each get one soft
-  // scrim (below), so planets passing behind dim gently instead of being cut off by boxes; the logo and the hand-drawn
-  // arrow only keep the planet names off them
-  const tail = space.querySelector('.hobbies-tail');
+  // the hackerfab section's text sits over this canvas too: the headline, the sentence under it, "our website", "check it
+  // out!" and the SiO2 note each get one soft scrim (below), so planets passing behind dim gently instead of being cut off
+  // by boxes; the logo and the hand-drawn arrows only keep the planet names off them
+  const tail = space.querySelector('.hackerfab');
   walk(tail, true);
-  if (tail) for (const el of tail.querySelectorAll('img, .brand-arrow path')) { const r = el.getBoundingClientRect(); if (r.width || r.height) solid.push(r); }
+  if (tail) for (const el of tail.querySelectorAll('img, .brand-arrow path, .hobbies-note-arrow path')) { const r = el.getBoundingClientRect(); if (r.width || r.height) solid.push(r); }
   const box = (r, m) => [Math.max(0, Math.floor((r.left - cr.left) / qx) - m), Math.min(W - 1, Math.ceil((r.right - cr.left) / qx) + m),
     Math.max(0, Math.floor((r.top - cr.top) / qy) - m), Math.min(BH - 1, Math.ceil((r.bottom - cr.top) / qy) + m)];
   const apply = (r, m, f) => {
@@ -1743,7 +1743,7 @@ window.addEventListener('popstate', () => {
   } else if (id === 'outer' || id === '') {          // a scene: close any open body first, then fly if needed
     const want = id === 'outer' ? 'outer' : 'inner';
     if (view.id) { pendingScene = want; closeView(); } else goScene(want);
-  } else closeView();                                // another page's anchor (#hobbies): leave the scene as it is
+  } else closeView();                                // another anchor on the page (#about): leave the scene as it is
 });
 
 // what is under the pointer: a planet (a BODIES entry), 'SUN', 'BELT', or null

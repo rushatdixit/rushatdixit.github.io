@@ -1,61 +1,67 @@
-// The HackerFab logo block: centre it between the page's left edge and the wafer's left end, and draw a
-// hand-drawn arrow from "hackerfab iitb" (closing line) up to the "our website" link, with a note on it.
+// The hackerfab section's text around the wafer:
+//  - the blue hand-drawn arrow from "check it out!" up to the "our website" link beside the logo;
+//  - the headline kept clear of the wafer (and of the SiO2 note) at every width: its top margin grows (--hf-clear)
+//    until no line of it reaches up into the wafer's outline, measured on the wafer's resting pose.
 (() => {
   const canvas = document.querySelector('.wafer-canvas');
-  const tail = document.querySelector('.hobbies-tail');
-  const brand = document.querySelector('.hobbies-brand');
-  const link = document.querySelector('.hobbies-brand a');
-  const word = document.querySelector('.hobbies-closing .blue');
+  const section = document.querySelector('.hackerfab');
+  const inner = document.querySelector('.hf-inner');
+  const link = document.querySelector('.hf-brand-text a');
+  const note = document.querySelector('.brand-note');
   const line = document.querySelector('.brand-line');
   const head = document.querySelector('.brand-head');
-  const note = document.querySelector('.brand-note');
-  if (!canvas || !tail || !brand || !link || !word || !line || !head || !note) return;
+  const headline = document.querySelector('.hf-headline');
+  const sio2 = document.querySelector('.hobbies-note');
+  if (!canvas || !section || !inner || !link || !note || !line || !head || !headline) return;
 
-  function layout() {
-    // ---- centre the logo block in the gap left of the wafer ----
-    const left = canvas.waferLeft && canvas.waferLeft();
-    if (left) {
-      const gap = parseFloat(getComputedStyle(tail).getPropertyValue('--edge-gap')) || 0;
-      brand.style.setProperty('--brand-cx', `${left / 2}px`);
-      brand.style.setProperty('--brand-max', `${Math.max(80, 0.9 * left - 2 * gap)}px`);
-    }
-
-    // ---- arrow from the words up to the link ----
-    const t = tail.getBoundingClientRect();
-    const l = link.getBoundingClientRect();
-    const r = word.getClientRects()[0] || word.getBoundingClientRect();
-    const sx = r.left - t.left + r.width * 0.4, sy = r.top - t.top - 12;     // just above the words
-    const ex = l.left - t.left + l.width / 2, ey = l.bottom - t.top + 16;    // just below the link
-    const dx = ex - sx, dy = ey - sy;                                          // pointing up and to the left (dy < 0)
-
-    if (!(dy < -60)) {                                                         // no room for a sensible arrow
-      line.setAttribute('d', '');
-      head.setAttribute('d', '');
-      note.style.visibility = 'hidden';
-      return;
-    }
-    note.style.visibility = '';
-
-    const c1x = sx - 30, c1y = sy + dy * 0.45;
-    const c2x = ex + Math.min(110, Math.abs(dx) * 0.35), c2y = ey - dy * 0.3;  // end control: below-right of the end
+  function drawArrow() {
+    const t = inner.getBoundingClientRect(), l = link.getBoundingClientRect(), n = note.getBoundingClientRect();
+    const k = section.clientWidth / 100;                                     // 1vw of the page
+    const sx = n.left - t.left - 0.6 * k, sy = n.top - t.top + n.height * 0.5;   // just left of "check it out!"
+    const ex = l.left - t.left + l.width * 0.18, ey = l.bottom - t.top + 0.5 * k; // just under the link
+    // out to the left, then up into the link
+    const c1x = sx - 2.2 * k, c1y = sy + 0.2 * k;
+    const c2x = ex - 0.8 * k, c2y = ey + 1.6 * k;
     line.setAttribute('d', `M${sx},${sy} C${c1x},${c1y} ${c2x},${c2y} ${ex},${ey}`);
 
     // slightly uneven arrowhead aligned with the final tangent
-    const a = Math.atan2(ey - c2y, ex - c2x);
-    const barb = (len, off) =>
-      `M${ex},${ey} L${ex - Math.cos(a + off) * len},${ey - Math.sin(a + off) * len}`;
-    head.setAttribute('d', barb(24, 0.5) + ' ' + barb(20, -0.55));
+    const a = Math.atan2(ey - c2y, ex - c2x), len = Math.max(8, Math.min(20, 1.2 * k));
+    const barb = (l, off) => `M${ex},${ey} L${ex - Math.cos(a + off) * l},${ey - Math.sin(a + off) * l}`;
+    head.setAttribute('d', barb(len, 0.5) + ' ' + barb(len * 0.82, -0.55));
+  }
 
-    // "check it out!" to the lower-left of the curve's midpoint, on empty black
-    const mt = 0.5, u = 1 - mt;
-    const mx = u * u * u * sx + 3 * u * u * mt * c1x + 3 * u * mt * mt * c2x + mt * mt * mt * ex;
-    const my = u * u * u * sy + 3 * u * u * mt * c1y + 3 * u * mt * mt * c2y + mt * mt * mt * ey;
-    note.style.left = `${mx - note.offsetWidth * 0.5 - 24}px`;
-    note.style.top = `${my + 8}px`;
+  // move the headline down until it clears the wafer and the note (never up past its own 24vw margin: see the CSS)
+  function clearHeadline() {
+    const pts = canvas.waferOutline ? canvas.waferOutline() : [];
+    const s = section.getBoundingClientRect();
+    const gap = Math.max(16, 0.02 * section.clientWidth);
+    let need = -Infinity;
+    const range = document.createRange();
+    range.selectNodeContents(headline);
+    for (const r of range.getClientRects()) {
+      const top = r.top - s.top, x0 = r.left - s.left - gap, x1 = r.right - s.left + gap;
+      let low = -Infinity;                                               // the wafer's lowest point over this line
+      for (const p of pts) if (p.x >= x0 && p.x <= x1) low = Math.max(low, p.y);
+      if (low > -Infinity) need = Math.max(need, low + gap - top);
+      if (sio2 && sio2.offsetParent !== null) {
+        const q = sio2.getBoundingClientRect();
+        if (q.right > r.left - gap && q.left < r.right + gap) need = Math.max(need, q.bottom + gap - r.top);
+      }
+    }
+    if (need === -Infinity) return;
+    const margin = parseFloat(getComputedStyle(headline).marginTop) || 0;
+    const want = Math.max(0, Math.round(margin + need));
+    if (Math.abs(want - (parseFloat(headline.style.getPropertyValue('--hf-clear')) || 0)) >= 1) headline.style.setProperty('--hf-clear', want + 'px');
+  }
+
+  function layout() {
+    clearHeadline();
+    drawArrow();
   }
 
   layout();
   canvas.addEventListener('wafer-fit', layout);
+  canvas.addEventListener('note-placed', layout);
   window.addEventListener('resize', layout);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
 })();

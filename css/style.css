@@ -7,6 +7,17 @@
   --photo-w: min(30vw, calc((100vh - 2 * var(--edge-gap)) * 440 / 666));
   --font: "Open Sauce Sans", system-ui, sans-serif;
   --hand: "Gochi Hand", "Comic Sans MS", cursive;
+  /* the page after the first screen: sizes follow the window width (the mockup's clamp() values), so a phone gets the
+     same layout scaled down */
+  --page-x: clamp(20px, 3.4vw, 48px);     /* side padding */
+  --ink: #f3f1ec;                          /* headings and body text */
+  --ink-2: #d4d7de;                        /* secondary text */
+  --ink-3: #b9bec9;                        /* tertiary text: nav, intro lines */
+  --rule: #23262f;                         /* hairlines between project rows */
+  --underline: #4a5060;                    /* resting link underline */
+  --navy: #8fa3ff;                         /* the "navy" accent, lightened so it reads on black */
+  --body-size: clamp(17px, 1.9vw, 30px);
+  --title-size: clamp(32px, 4.6vw, 76px);
 }
 
 *,
@@ -31,27 +42,14 @@ body {
 html {
   background: var(--bg);        /* the root itself is black, so no white can show at a rounding gap or when overscrolling */
   color-scheme: dark;
-  /* the browser's own snapping: every screen is a stop and the page never rests part-way. The Hobbies screens sit in an
-     overflow:clip box (not a scroll container), so they count as page-level stops. Smooth scrolling just for the site's
-     own in-page jumps, and not with reduced motion */
-  scroll-snap-type: y mandatory;
-}
-/* a screen whose content is taller than the window (set by js/scroll.js): snap only when close, so nothing is unreachable */
-html.snap-loose { scroll-snap-type: y proximity; }
-
-.hero,
-.hobbies-slide,
-.hobbies-tail,
-.page4 {
-  scroll-snap-align: start;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
 }
 
-/* the hackerfab screen and page 4 share one background: the solar system canvas (js/solar.js) sits behind both and
-   scrolls with them natively, from the top of the hackerfab screen to the bottom of page 4 */
+/* hackerfab and about share one background: the solar system canvas (js/solar.js) sits behind both and scrolls with
+   them natively, from the top of hackerfab to the bottom of about */
 .space {
   position: relative;
   overflow-x: clip;             /* a planet button near the right edge must never widen the page */
@@ -229,28 +227,27 @@ html.snap-loose { scroll-snap-type: y proximity; }
   object-fit: cover;
 }
 
-/* ---- page 4: a blank canvas, one screen tall, black like the rest ---- */
-.page4 {
+/* ---- about: as tall as its text, with room at the bottom for the pixel captions ---- */
+.about {
   position: relative;
   z-index: 1;                  /* above the shared solar system canvas; no background of its own */
-  height: 100svh;
-  min-height: 100svh;
-  overflow: clip;
+  min-height: 56.94vw;
+  padding: 3vw var(--page-x) max(9vw, calc(var(--edge-gap) + 4.5rem));
 }
 
-/* the solar system: behind both sections (stars, then orbits and planets; the wafer, logo and text are all in front).
-   It fades in over the top of the hackerfab screen, where the screen above begins */
+/* the solar system: behind hackerfab and about (stars, then orbits and planets; the wafer, logo and text are all in
+   front), as tall as the two sections are. It fades in over the top of hackerfab, under the header */
 .solar-canvas {
   position: absolute;
-  top: 100svh;
+  top: 0;
   left: 0;
   width: 100%;
-  height: 200svh;
+  height: 100%;
   z-index: 0;
   display: block;
   image-rendering: pixelated;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 25svh);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 25svh);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 clamp(80px, 12vw, 200px));
+  mask-image: linear-gradient(to bottom, transparent 0, #000 clamp(80px, 12vw, 200px));
 }
 
 .page4-hint,
@@ -291,114 +288,94 @@ html.snap-loose { scroll-snap-type: y proximity; }
 }
 
 .page4-text {
-  position: absolute;
+  position: relative;
   z-index: 1;
-  top: var(--edge-gap);
-  left: var(--edge-gap);
-  max-width: calc(100% - 2 * var(--edge-gap));
+  max-width: max(46vw, 330px);
 }
 
-.page4-title {
-  margin: 0;
-  text-align: left;
+.page4-title,
+.section-title {
+  margin: 0 0 1.6vw;
   font-family: var(--font);
-  font-weight: 700;
-  font-size: calc(clamp(1rem, min(4vw, 6.9vh), 3.56rem) * var(--bio-scale, 1));   /* same type as the other headings */
-  line-height: 1.12;
-  text-transform: lowercase;
-  color: var(--fg);
-}
-
-.page4-points {
-  max-width: min(100%, 60rem);
-  margin: 1.1em 0 0;
-  padding: 0;
-  list-style: none;
-  font-family: var(--font);
-  font-weight: 700;
-  font-size: calc(clamp(1.275rem, min(2.85vw, 5.4vh), 2.4rem) * var(--bio-scale, 1));   /* 1.5x the earlier size */
-  line-height: 1.3;
-  color: var(--fg);
-}
-
-.page4-points li {
-  position: relative;
-  padding-left: 1.1em;
-}
-
-.page4-points li + li {
-  margin-top: 0.7em;
-}
-
-.page4-points li::before {
-  content: "";
-  position: absolute;
-  left: 0.1em;
-  top: 0.6em;
-  width: 0.32em;
-  height: 0.32em;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-/* ---- hobbies scene: WebGL silicon wafer on a black page ---- */
-.hobbies {
-  --ink: #f3f1ec;      /* text on the black Hobbies page */
-  --navy: #8fa3ff;     /* the "navy" accent, lightened so it reads on black */
-  position: relative;
-  z-index: 1;                  /* above the shared solar system canvas: the wafer, the logo and the text */
-  height: 200svh;              /* two screens: the wafer runs on from the first into the second */
-  overflow: clip;              /* clips the canvas to the section without making it a scroll container */
+  font-weight: 600;
+  font-size: var(--title-size);
+  line-height: 1;
+  letter-spacing: -0.03em;
   color: var(--ink);
 }
 
-/* screen 1: the text, links and note laid over the top of the wafer */
-.hobbies-slide {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 100svh;
-  min-height: 100svh;
-}
-
-/* screen 2: nothing but black and the lower part of the wafer (this block only reserves the height) */
-.hobbies-tail {
-  position: absolute;
-  top: 100svh;
-  left: 0;
-  right: 0;
-  height: 100svh;
-  min-height: 100svh;
-}
-
-/* the HackerFab IITB logo, top-left of the last screen, with its link centred underneath */
-.hobbies-brand {
-  position: absolute;
-  top: var(--edge-gap);
-  /* centred between the page's left edge and the wafer's left end (js/brand.js sets --brand-cx / --brand-max) */
-  left: var(--brand-cx, calc(var(--edge-gap) + 7.125rem));
-  translate: -50% 0;
+.about-body {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.6em;
-  width: min(clamp(7.5rem, min(16.5vw, 30vh), 14.25rem), var(--brand-max, 100vw));
-  font-size: clamp(1.05rem, min(2.7vw, 5vh), 2.25rem);   /* 1.5x the project links' size */
+  gap: 1.3vw;
+  font-size: var(--body-size);
+  line-height: 1.5;
+  color: #e3e5ea;
 }
 
-.hobbies-brand img {
-  display: block;
+.about-body p { margin: 0; }
+
+/* the coloured words: the two that go somewhere are links, underlined in their own colour */
+.about-body a {
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+  text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+}
+.about-body a:hover { text-decoration-color: currentColor; }
+
+/* ---- hackerfab: the WebGL silicon wafer top-right, the logo block top-left, then the headline and a sentence ---- */
+.hackerfab {
+  position: relative;
+  z-index: 1;                  /* above the shared solar system canvas: the wafer, the logo and the text */
+  min-height: 52.78vw;
+  overflow: clip;              /* clips the wafer to the section without making it a scroll container */
+  color: var(--ink);
+}
+
+.wafer-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hf-inner {
+  position: relative;
+  z-index: 2;
+  padding: 3vw var(--page-x) 5vw;
+}
+
+/* the logo, with "our website" beside it and "check it out!" below that (js/brand.js draws the arrow between them) */
+.hf-brand {
+  display: flex;
+  align-items: center;
+  gap: 2.2vw;
+  width: fit-content;
+  max-width: 46vw;
+}
+
+.hf-brand img {
+  display: block;
+  flex: 0 0 auto;
+  width: clamp(72px, 10vw, 150px);
   height: auto;                /* the width/height attributes only reserve the space (no layout shift); CSS sets the size */
   aspect-ratio: 1;
   border-radius: 50%;
   object-fit: cover;
 }
 
-.hobbies-brand a {
+.hf-brand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.hf-brand-text a {
   font-family: var(--font);
-  font-weight: 700;
+  font-weight: 600;
+  font-size: clamp(18px, 1.8vw, 28px);
   line-height: 1.2;
   white-space: nowrap;
   color: var(--ink);
@@ -409,14 +386,25 @@ html.snap-loose { scroll-snap-type: y proximity; }
   transition: text-decoration-color 0.2s ease;
 }
 
-.hobbies-brand a:hover {
-  text-decoration-color: #f19bd8;
-}
+.hf-brand-text a:hover { text-decoration-color: #f19bd8; }
 
-.hobbies-brand a:focus-visible {
+.hf-brand-text a:focus-visible {
   outline: 2px solid #f19bd8;
   outline-offset: 4px;
   border-radius: 2px;
+}
+
+/* "check it out!" sits below and to the right of the link, so the arrow has room to curve up to it */
+.brand-note {
+  margin: 2.2vw 0 0 4.5vw;
+  rotate: -4deg;
+  transform-origin: left center;
+  color: #4f86ff;
+  font-family: var(--hand);
+  font-size: clamp(18px, 1.9vw, 30px);
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .brand-arrow {
@@ -431,47 +419,35 @@ html.snap-loose { scroll-snap-type: y proximity; }
 .brand-arrow path {
   fill: none;
   stroke: #4f86ff;
-  stroke-width: 3.5;
+  stroke-width: clamp(2px, 0.22vw, 3.5px);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.brand-note {
-  position: absolute;
-  left: 0;
-  top: 0;
-  translate: -50% -50%;
-  rotate: -4deg;
-  color: #4f86ff;
-  font-family: var(--hand);
-  font-size: clamp(1.4rem, min(2.8vw, 5vh), 2.4rem);
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-/* the closing line, bottom-left of the last screen: same type as the heading above */
-.hobbies-closing {
-  position: absolute;
-  left: var(--edge-gap);
-  bottom: var(--edge-gap);
-  max-width: calc(100% - 2 * var(--edge-gap));
-  margin: 0;
+/* the headline: kept below the wafer at every width (js/brand.js raises --hf-clear when the wafer reaches lower) */
+.hf-headline {
+  max-width: 92vw;
+  margin: max(24vw, var(--hf-clear, 0px)) 0 0;
   font-family: var(--font);
-  font-weight: 700;
-  font-size: clamp(1rem, min(4vw, 6.9vh), 3.56rem);
-  line-height: 1.12;
-  text-transform: lowercase;
+  font-weight: 600;
+  font-size: clamp(36px, 7vw, 116px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
   color: var(--ink);
 }
 
-.wafer-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  opacity: 0;                 /* faded in by js/scroll.js as the page eases to light */
+.hf-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1vw;
+  max-width: max(52vw, 330px);
+  margin-top: 2.6vw;
+  font-size: var(--body-size);
+  line-height: 1.5;
+  color: var(--ink-2);
 }
+
+.hf-body p { margin: 0; }
 
 .navy {
   color: var(--navy);
@@ -489,73 +465,25 @@ html.snap-loose { scroll-snap-type: y proximity; }
   color: #b57bff;
 }
 
-.hobbies-text {
-  position: absolute;
-  top: var(--edge-gap);
-  left: var(--edge-gap);
-  max-width: calc(100% - 2 * var(--edge-gap));
-}
-
-.hobbies-title {
-  width: fit-content;
-  margin: 0;
-  font-family: var(--font);
-  font-weight: 700;
-  font-size: clamp(1rem, min(4vw, 6.9vh), 3.56rem);   /* same as the name in the hero on normal screens; shrinks on short windows */
-  line-height: 1.12;
-  text-transform: lowercase;
-  color: var(--ink);
-}
-
-.hobbies-links {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5em;
-  margin-top: 1.05em;
-  font-size: clamp(0.7rem, min(1.8vw, 3.3vh), 1.5rem);   /* the links' size; spacing above and between is in em */
-}
-
-.hobbies-links a {
-  font-family: var(--font);
-  font-weight: 700;
-  font-size: 1em;
-  line-height: 1.2;
-  color: var(--ink);
-  text-decoration: underline;
-  text-decoration-thickness: 0.08em;
-  text-underline-offset: 0.22em;
-  text-decoration-color: color-mix(in srgb, var(--ink) 45%, transparent);
-  transition: text-decoration-color 0.2s ease;
-}
-
-.hobbies-links a:hover {
-  text-decoration-color: #f19bd8;
-}
-
-.hobbies-links a:focus-visible {
-  outline: 2px solid #f19bd8;
-  outline-offset: 4px;
-  border-radius: 2px;
-}
-
-/* handwritten note, bottom-left, with an arrow to the wafer */
+/* the handwritten SiO2 note, by the wafer's lower-left edge, with an arrow to it (js/note.js places both) */
 .hobbies-note {
   position: absolute;
-  left: var(--edge-gap);
-  bottom: var(--edge-gap);
-  max-width: min(max(24vw, 9rem), 22rem);
+  z-index: 2;
+  left: 0;
+  top: 0;
+  width: clamp(150px, 19vw, 300px);
   margin: 0;
   font-family: var(--hand);
-  font-size: clamp(0.7rem, min(1.7vw, 3vh), 1.5rem);
-  line-height: 1.25;
+  font-size: clamp(14px, 1.55vw, 24px);
+  line-height: 1.2;
   color: var(--navy);
-  rotate: -1.5deg;
-  transform-origin: left bottom;
+  rotate: -3deg;
+  transform-origin: right top;
 }
 
 .hobbies-note-arrow {
   position: absolute;
+  z-index: 2;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -566,9 +494,172 @@ html.snap-loose { scroll-snap-type: y proximity; }
 .hobbies-note-arrow path {
   fill: none;
   stroke: var(--navy);
-  stroke-width: 3.5;
+  stroke-width: clamp(2px, 0.2vw, 3px);
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* ---- header: after the first screen, static ---- */
+.site-header {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: clamp(18px, 2.2vw, 32px) var(--page-x);
+}
+
+.site-name {
+  font-weight: 700;
+  font-size: clamp(18px, 1.6vw, 24px);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px clamp(18px, 2.4vw, 36px);
+  font-size: clamp(16px, 1.35vw, 20px);
+}
+
+.site-nav a {
+  color: var(--ink-3);
+  text-decoration: none;
+}
+
+.site-name:hover,
+.site-nav a:hover { color: var(--ink); }
+
+/* ---- projects: three rows, each a name (linking to it); photo, year and sentence when there are some ---- */
+.projects {
+  position: relative;
+  z-index: 2;
+  padding: 9vw var(--page-x) 5vw;
+}
+
+.section-title { margin-bottom: 1.2vw; }
+
+.projects-intro {
+  max-width: max(52vw, 330px);
+  margin: 0 0 3.4vw;
+  font-size: var(--body-size);
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.project-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--rule);
+}
+
+.project {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2.4vw;
+  padding: 2.4vw 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.project-photo {
+  flex: 0 0 clamp(120px, 20vw, 300px);
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+.project-text {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vw;
+}
+
+.project-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.project-name {
+  font-size: clamp(20px, 2.6vw, 42px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.16em;
+  text-decoration-color: var(--underline);
+}
+
+.project-name:hover { text-decoration-color: var(--ink); }
+
+.project-year {
+  font-size: clamp(15px, 1.4vw, 22px);
+  color: #8e94a3;
+}
+
+.project-desc {
+  max-width: 48ch;
+  margin: 0;
+  font-size: clamp(16px, 1.6vw, 26px);
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+/* ---- footer ---- */
+.site-footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  padding: 6vw var(--page-x) 4vw;
+}
+
+.site-footer .section-title { margin: 0; }
+
+.footer-email {
+  font-size: clamp(18px, 2.2vw, 34px);
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px clamp(18px, 2.2vw, 34px);
+  margin: 0;
+  font-size: clamp(16px, 1.4vw, 22px);
+  color: var(--ink-3);
+}
+
+.site-footer a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+  text-decoration-color: var(--underline);
+}
+
+.site-footer a:hover { text-decoration-color: var(--ink); }
+
+.site-header a:focus-visible,
+.about-body a:focus-visible,
+.project-name:focus-visible,
+.site-footer a:focus-visible {
+  outline: 2px solid #f19bd8;
+  outline-offset: 4px;
+  border-radius: 2px;
 }
 
 /* the planet close-up: sits above the overview canvas, below the text, and fades in over the last part of the zoom */
@@ -809,10 +900,6 @@ html.snap-loose { scroll-snap-type: y proximity; }
 }
 
 @media (max-width: 700px) {
-  html {
-    scroll-snap-type: y proximity;   /* the stacked hero is taller than the screen: let it scroll freely, snap only when close */
-  }
-
   .hero {
     height: auto;
     padding: var(--edge-gap);
