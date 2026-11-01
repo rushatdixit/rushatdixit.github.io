@@ -11,20 +11,39 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/open-sauce-sans/700.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/gochi-hand/400.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/press-start-2p/400.css">
-  <link rel="stylesheet" href="css/style.css?v=91">
-  <script src="js/brand.js?v=91" defer></script>
-  <script src="js/scroll.js?v=91" defer></script>
-  <script src="js/callout.js?v=91" defer></script>
-  <script src="js/backgrounds.js?v=91" defer></script>
-  <script src="js/bodies.js?v=91" defer></script>
-  <script src="js/solar.js?v=91" defer></script>
-  <script src="js/planet-view.js?v=91" defer></script>
-  <script src="js/planet-callouts.js?v=91" defer></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css">
+  <link rel="stylesheet" href="css/style.css?v=97">
+  <script src="js/brand.js?v=97" defer></script>
+  <script src="js/scroll.js?v=97" defer></script>
+  <script src="js/callout.js?v=97" defer></script>
+  <script src="js/backgrounds.js?v=97" defer></script>
+  <script src="js/bodies.js?v=97" defer></script>
+  <script src="js/solar.js?v=97" defer></script>
+  <script src="js/planet-view.js?v=97" defer></script>
+  <script src="js/planet-callouts.js?v=97" defer></script>
+  <!-- KaTeX comes from a CDN, so it goes last but one: a slow CDN must not hold up anything above. field.js uses it -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js" defer></script>
+  <script src="js/field.js?v=97" defer></script>
 </head>
 <body>
+  <!-- the electric field of the charges in the first screen (js/field.js): the bottom-most layer of the page -->
+  <canvas class="field-canvas" aria-hidden="true"></canvas>
+  <div class="field-eq" role="img" aria-label="Poisson's equation: the Laplacian of the potential V equals minus the charge density over epsilon zero">
+    <span class="field-eq-main" aria-hidden="true"></span>
+  </div>
+  <div class="field-controls">
+    <div class="field-sign" role="group" aria-label="charge to add">
+      <button type="button" data-sign="1" aria-pressed="true" aria-label="positive charge">+</button>
+      <button type="button" data-sign="-1" aria-pressed="false" aria-label="negative charge">−</button>
+    </div>
+    <button type="button" class="field-reset">reset</button>
+    <span class="field-hint">click to add a charge</span>
+  </div>
+  <div class="charges"></div>
   <main id="top">
     <section class="hero">
       <h1 class="name">Rushat Dixit</h1>
+      <div class="field-slot" aria-hidden="true"></div>   <!-- phones: the room for the charges between the name and the photo -->
       <img class="portrait" src="images/me.jpg" alt="Portrait of me" width="440" height="666">
       <svg class="callout" aria-hidden="true">
         <path class="callout-line"/>

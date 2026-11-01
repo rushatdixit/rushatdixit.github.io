@@ -120,10 +120,17 @@ const rgb = (r, g, b) => (0xff << 24) | (b << 16) | (g << 8) | r;
 const scale = ([r, g, b], k) => rgb(Math.min(255, Math.round(r * k)), Math.min(255, Math.round(g * k)), Math.min(255, Math.round(b * k)));
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
+// The page canvas lets the electric field (js/field.js) show through it. Everything is still drawn as if over black,
+// and on upload each pixel becomes see-through in proportion to how dark it is (toAlpha), except the solid bodies:
+// planets, moons, Saturn's rings and the Sun's disc, marked here while solidOn is set, which stay opaque.
+let solid = new Uint8Array(0), solidOn = false, pageBuf = null, outImg = null, outBuf = null;
 function plot(x, y, c) {
   x = Math.round(x);
   y = Math.round(y);
-  if (x >= 0 && x < W && y >= -TOP && y < H + BOT) buf[(y + TOP) * W + x] = c;
+  if (x >= 0 && x < W && y >= -TOP && y < H + BOT) {
+    buf[(y + TOP) * W + x] = c;
+    if (solidOn && buf === pageBuf) solid[(y + TOP) * W + x] = 1;
+  }
 }
 
 // a tiny body: one pixel, a 2x2 block, or (the larger Moon) a 3x3 block whose four corner pixels are dimmed so it reads round
@@ -150,12 +157,13 @@ function sphere(cx0, cy0, R, rot, colorAt, lx, ly, lz, bright, alpha = 1) {
       const light = dx * lx + dy * ly + nz * lz;
       const k = (light > 0.22 ? 1 : light > -0.12 ? 0.58 : 0.28) * bright;
       const col = scale(colorAt(Math.atan2(dx, nz) + rot, Math.asin(-dy)), k);
-      if (alpha >= 1) plot(x, y, col);
+      if (alpha >= 1) { const keep = solidOn; solidOn = true; plot(x, y, col); solidOn = keep; }
       else {                                                // blend over whatever is already there
         const xi = Math.round(x), yi = Math.round(y);
         if (xi >= 0 && xi < W && yi >= -TOP && yi < H + BOT) {
           const o = buf[(yi + TOP) * W + xi];
           buf[(yi + TOP) * W + xi] = rgb((o & 255) * (1 - alpha) + (col & 255) * alpha, ((o >> 8) & 255) * (1 - alpha) + ((col >> 8) & 255) * alpha, ((o >> 16) & 255) * (1 - alpha) + ((col >> 16) & 255) * alpha);
+          if (alpha >= 0.5 && buf === pageBuf) solid[(yi + TOP) * W + xi] = 1;
         }
       }
     }
@@ -177,6 +185,7 @@ function sun(sx, sy, R) {
       if (d <= R) {                                       // the disc: flat bands with dithered granulation
         const t = d / R + g * 0.16;
         buf[(y + TOP) * W + x] = t < 0.45 ? rgb(255, 246, 150) : t < 0.8 ? rgb(255, 218, 52) : rgb(255, 176, 22);
+        if (buf === pageBuf) solid[(y + TOP) * W + x] = 1;
       } else {                                            // stepped halo, ordered-dithered so its edges stay blocky
         const v = Math.pow(1 - (d - R) / (Rh - R), 1.6) * 4;
         const base = Math.floor(v);
@@ -973,9 +982,9 @@ function scenery(t, tOut) {
         zv: p.zv,
         draw: () => {
           dashes(false);
-          rings(false);
+          solidOn = true; rings(false); solidOn = false;
           sphere(bx, by, p.R, (TAU * tp) / b.spin, b.colorAt, lx, ly, lz, brightFor(p.near));
-          rings(true);
+          solidOn = true; rings(true); solidOn = false;
           dashes(true);
         },
       };
@@ -985,7 +994,7 @@ function scenery(t, tOut) {
       if (view.id === b.id && view.t > 0) break;             // (the open planet's moons go with it, onto the close-up layer)
       const r = k.m.bary ? p.R / 2 : k.m.r;                  // Charon: half Pluto's size
       if (k.m.bary) discs.push([k.sx, k.sy, r / k.zv]);
-      const mb = { zv: k.zv, draw: () => speck(k.sx, k.sy, r / k.zv, scale(k.m.color, brightFor(k.near))) };
+      const mb = { zv: k.zv, draw: () => { solidOn = true; speck(k.sx, k.sy, r / k.zv, scale(k.m.color, brightFor(k.near))); solidOn = false; } };
       (isOuter(b) || k.zv > sunZv ? far : near).push(mb);
     }
   });
@@ -1028,6 +1037,7 @@ function draw(t, tOut = clockOut) {
   if (!running) { r0 = 0; r1 = BH; }
   YMIN = r0 - TOP; YMAX = r1 - TOP;
   buf.fill(0xff000000, r0 * W, r1 * W);
+  solid.fill(0, r0 * W, r1 * W);
   if (reduceMotion && sceneMoving()) {
     // reduced motion: no camera move; the same world seen from the two positions crossfades
     setCam(CAM_IN); stars(); scenery(t, tOut);
@@ -1183,8 +1193,23 @@ function draw(t, tOut = clockOut) {
   else if (!layer.hidden && lbuf) lctx.clearRect(0, 0, lcv.width, lcv.height);
 
   updateButtons();
-  if (r1 > r0) ctx.putImageData(img, 0, 0, 0, r0, W, r1 - r0);       // upload just the rows on screen
+  if (r1 > r0) { toAlpha(r0, r1); ctx.putImageData(outImg, 0, 0, 0, r0, W, r1 - r0); }   // upload just the rows on screen
   if (DEBUG) drawDebug();
+}
+
+// the drawn rows, from "over black" to see-through: a solid body's pixel stays opaque; any other pixel keeps its colour at
+// an opacity of its brightest channel (un-premultiplied), so over black it looks exactly as drawn and over the electric
+// field the dark parts let the field through
+const INV = Float32Array.from({ length: 256 }, (_, a) => (a ? 255 / a : 0));
+function toAlpha(r0, r1) {
+  for (let i = r0 * W, e = r1 * W; i < e; i++) {
+    const c = buf[i];
+    if (solid[i]) { outBuf[i] = c | 0xff000000; continue; }
+    const r = c & 255, g = (c >> 8) & 255, b = (c >> 16) & 255, a = r > g ? (r > b ? r : b) : (g > b ? g : b);
+    if (!a) { outBuf[i] = 0; continue; }
+    const k = INV[a];
+    outBuf[i] = (a << 24) | (((b * k + 0.5) | 0) << 16) | (((g * k + 0.5) | 0) << 8) | ((r * k + 0.5) | 0);
+  }
 }
 
 function ring(sx, sy, r, c) {
@@ -1365,7 +1390,10 @@ function resize() {
   canvas.width = W;
   canvas.height = BH;
   img = ctx.createImageData(W, BH);
-  buf = new Uint32Array(img.data.buffer);
+  buf = pageBuf = new Uint32Array(img.data.buffer);
+  outImg = ctx.createImageData(W, BH);
+  outBuf = new Uint32Array(outImg.data.buffer);
+  solid = new Uint8Array(W * BH);
   YMIN = -TOP; YMAX = H + BOT;
   cacheOffsets();
   measureText();                                       // first, so the outer planets' arcs can keep off the bio
@@ -1633,6 +1661,7 @@ function sunDisc(sx, sy, R, alpha) {
       const g = (BAYER[((y & 3) << 2) | (x & 3)] + 0.5) / 16 - 0.5, t = d / R + g * 0.16;
       const c = t < 0.45 ? [255, 246, 150] : t < 0.8 ? [255, 218, 52] : [255, 176, 22], o = buf[(y + TOP) * W + x];
       buf[(y + TOP) * W + x] = rgb((o & 255) * (1 - alpha) + c[0] * alpha, ((o >> 8) & 255) * (1 - alpha) + c[1] * alpha, ((o >> 16) & 255) * (1 - alpha) + c[2] * alpha);
+      if (alpha >= 0.5 && buf === pageBuf) solid[(y + TOP) * W + x] = 1;
     }
   }
 }

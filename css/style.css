@@ -28,6 +28,7 @@
 
 body {
   margin: 0;
+  isolation: isolate;          /* its own stacking context: its black paints under the electric field (z-index -1) */
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font);
@@ -54,6 +55,135 @@ html {
   position: relative;
   overflow-x: clip;             /* a planet button near the right edge must never widen the page */
 }
+
+/* ---- the electric field of the charges in the first screen (js/field.js): the bottom-most layer of the page, two
+   screens tall from the very top. Everything else draws over it; it never takes the pointer ---- */
+.field-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 200vh;               /* js/field.js sets it to two window heights */
+  z-index: -1;
+  display: block;
+  pointer-events: none;
+}
+
+/* Poisson's equation right above the control, both just left of the photo above the subtitle (on phones, under the
+   starting charges). Placed by js/field.js */
+.field-eq,
+.field-controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  white-space: nowrap;
+}
+.field-eq {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35em;
+  font-size: max(2vw, 22.5px);
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 0.25em #000, 0 0 0.5em #000;   /* a soft halo, so the field lines crossing it don't cut the symbols */
+  pointer-events: none;
+}
+.field-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.field-sign {
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.field-sign button {
+  width: 32px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+}
+.field-sign button + button { border-left: 1px solid rgba(255, 255, 255, 0.55); }
+.field-sign button[aria-pressed="true"] { background: rgba(255, 255, 255, 0.88); color: #0b0b10; }
+.field-reset {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.field-reset:hover { text-decoration-color: currentColor; }
+.field-sign button:focus-visible,
+.field-reset:focus-visible,
+.charge:focus-visible { outline: 2px dashed #fff; outline-offset: 3px; }
+.field-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+.field-hint[hidden] { display: none; }
+
+/* the charges: white discs with a soft ring and a dark + or -, placed and sized by js/field.js. Real buttons: drag to move,
+   click to remove; a finger drag moves the charge instead of scrolling the page */
+.charges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 0;
+  height: 0;
+}
+.charge {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25), 0 0 10px rgba(255, 255, 255, 0.25);
+  font-family: var(--font);
+  font-weight: 600;
+  line-height: 1;
+  color: #15151c;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.charge.is-dragging { cursor: grabbing; }
+/* +q or -q in KaTeX beside each disc's top right (placed by js/field.js) */
+.charge-label {
+  position: absolute;
+  white-space: nowrap;
+  font-size: max(1.35vw, 16px);
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 0.25em #000, 0 0 0.5em #000;
+  pointer-events: none;
+}
+
+/* the empty part of the first screen takes a click (a new charge); its text, links and photo keep their own cursor */
+.hero { cursor: crosshair; }
+.hero > :not(.field-slot) { cursor: auto; }
+
+.field-slot { display: none; }   /* phones only (below): the room for the charges between the name and the photo */
 
 .name {
   position: absolute;
@@ -197,8 +327,8 @@ html {
 }
 
 /* the solar system: behind hackerfab, about and projects (stars, then orbits and planets; the logo and text are
-   all in front), as tall as the three sections are. It fades in over the top of hackerfab, under the header, and out to
-   black over its last 15%, before the footer */
+   all in front), as tall as the three sections are. It fades in over the top of hackerfab, under the header, and out
+   over its last 15%, before the footer, to transparent: the electric field underneath shows through it */
 .solar-canvas {
   position: absolute;
   top: 0;
@@ -834,6 +964,12 @@ html.planet-locked { overflow: hidden; }
   .name,
   .hero-tagline {
     position: static;
+  }
+
+  .field-slot {
+    display: block;
+    height: 330px;               /* two charges 130px apart at the steepest tilt, the equations and the control under them */
+    margin-top: var(--edge-gap);
   }
 
   .hero-tagline {
