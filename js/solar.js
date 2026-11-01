@@ -6,7 +6,9 @@
 (() => {
 const canvas = document.querySelector('.solar-canvas');
 if (!canvas) return;
-const page = canvas.closest('.page4') || canvas.parentElement;
+// the canvas is the shared background of the hackerfab screen and page 4 ("more about me"): it lives in .space, behind both
+const space = canvas.closest('.space') || canvas.parentElement;
+const page = document.querySelector('.page4') || space;
 const ctx = canvas.getContext('2d');
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TAU = Math.PI * 2;
@@ -26,53 +28,48 @@ const MARS_RADIUS = 0.28;          // Mars's orbit radius as a fraction of the c
 const BELT_WIDTH = 0.06;           // belt band: plus or minus this fraction of its radius
 const BELT_COUNT = 8000;
 const TEXT_DIM = 0.3;              // brightness left behind the text (1 = no dimming)
+const SCRIM_DIM = 0.45, SCRIM_FEATHER = 5;   // the hackerfab text's soft scrim: its darkest, and how far it fades out (vmin)
 
 // ONE solar system: one sun, one plane, one list of orbits. The "outer scene" is only a second camera position: the same
 // camera (same height, tilt and lens, no zoom) moved along the plane towards the screen's top-left until the asteroid belt
 // reaches the bottom-right corner. Each outer orbit is solved to cross the screen diagonal, seen from there, at the given
 // fraction of the way from the bottom-right corner to the top-left one, so they are evenly spaced at any aspect ratio.
 const OUT_BELT = 0.06;             // from the outer camera, the asteroid belt just cuts the bottom-right corner
-const KUIPER_BAND = [0.8, 1.05];   // the Kuiper belt: a dense band through the top-left corner
-const KUIPER_COUNT = 1000;         // icy specks, all spread along the band's on-screen arc
+const KUIPER_BAND = [1.04, 1.35];  // the Kuiper belt: a ring from just outside Pluto's orbit to about 1.3x that (x Pluto's radius)
+const KUIPER_DENSITY = 1.5;        // the Kuiper band looks this much denser on screen than the asteroid belt (it is the bigger belt)
+const KUIPER_SEEN = [700, 900];    // ... within these many bodies on the screen that shows the most of it (outer view)
 const SCENE_MS = reduceMotion ? 250 : 1400;   // the camera's move between the two positions (a crossfade with reduced motion)
 const STAR_COUNT = 150, STAR_PARALLAX = 0.3;  // dim background stars; they slide at 30% of the scenery's speed
-const ARRIVE_MIN_S = 3;            // arriving in the outer scene lands on a moment when all five bodies stay in view this long
 
 // every body's on-screen diameter, in vmin, in both scenes (planets keep this size wherever they are on their orbits).
 // The Sun keeps its own rule (SUN_R of the diagonal: about 45 vmin at 1440x900) and must stay the biggest thing on screen;
 // checkSizes() warns if the Sun is under 4x Jupiter, a giant under 2x Earth, or Pluto not the smallest.
 const SIZES = { mercury: 2.2, venus: 3.5, earth: 3.5, mars: 2.6, jupiter: 10, saturn: 9, saturnRings: 20, uranus: 7, neptune: 7, pluto: 1.8 };
 
-// orbit = radius relative to Mars (Mercury's is computed from the sun's size instead); incl = orbital-plane tilt; period in seconds per lap (counter-clockwise on screen); the size
-// comes from SIZES; start = starting phase in degrees (chosen by the timeline search so a planet is always in
-// view); lull = how much the planet slows down while it crosses the part of its orbit that is on screen (0 = steady
-// speed, 0.46 = a twelfth of its average speed there). The lap time is unchanged; the planet just lingers on
-// screen, like a planet near aphelion, which is what lets at least one planet always be in view.
+// orbit = radius relative to Mars (Mercury's is computed from the sun's size instead); incl = orbital-plane tilt; speed =
+// how fast the planet moves across the screen while any of it is on screen, in css px/s (inner planets faster); the size
+// comes from SIZES; start = where on its orbit it starts, in degrees. Motion is driven by the screen, not by a fixed
+// timeline: a planet on screen moves at its speed; one that is wholly hidden jumps straight to just before the point where
+// it would come back into view, waits a few seconds and then comes out (see stepPlanets)
 const BODIES = [
-  { id: 'mercury', name: 'MERCURY', orbit: 0, incl: MERCURY_INCLINATION, period: 20, start: 258, lull: 0.46, spin: 25,
+  { id: 'mercury', name: 'MERCURY', orbit: 0, incl: MERCURY_INCLINATION, speed: 19.5, start: 258, spin: 25,
     colorAt: (lon, lat) => (Math.sin(5 * lon + 1) * Math.sin(6 * lat + 2) > 0.7 ? [206, 112, 40] : [240, 144, 54]), moons: [] },
-  { id: 'venus', name: 'VENUS', orbit: 0.47, period: 40, start: 178.9, lull: 0.46, spin: 40,
+  { id: 'venus', name: 'VENUS', orbit: 0.47, speed: 18, start: 178.9, spin: 40,
     colorAt: (lon, lat) => (Math.sin(3 * lat + lon) + 0.5 * Math.sin(7 * lat) > 0.2 ? [176, 90, 52] : [148, 68, 40]), moons: [] },
-  { id: 'earth', name: 'EARTH', orbit: 0.66, period: 80, start: 16.3, lull: 0.448, spin: 7,
+  { id: 'earth', name: 'EARTH', orbit: 0.66, speed: 16.5, start: 16.3, spin: 7,
     colorAt: (lon, lat) => {
       const v = Math.sin(2 * lon + 1.3) * Math.cos(3 * lat) + 0.6 * Math.sin(3 * lon - 2 * lat) + 0.3 * Math.sin(5 * lon + 2 * lat + 1);
       return v > 0.5 ? [62, 174, 74] : [32, 96, 214];
     },
     moons: [{ ra: 2.5, period: 4, phase: 1.0, r: 2.2, color: [244, 244, 248] }] },
-  { id: 'mars', name: 'MARS', orbit: 1, period: 160, start: 343.4, lull: 0.277, spin: 9,
+  { id: 'mars', name: 'MARS', orbit: 1, speed: 15, start: 343.4, spin: 9,
     colorAt: (lon, lat) => (Math.sin(2 * lon + 1) * Math.cos(3 * lat) > 0.35 ? [150, 44, 36] : [212, 66, 50]),
     moons: [
       { ra: 2.3, period: 2.2, phase: 0.3, r: 1, color: [150, 150, 156] },   // Phobos
       { ra: 3.5, period: 5.5, phase: 2.5, r: 1, color: [176, 176, 182] },   // Deimos
     ] },
-  // the outer scene. diag = where the orbit crosses the screen diagonal seen from the outer camera position; periods 200 to 600 s, so the
-  // whole pattern repeats every 6000 s. linger = the share of each lap spent crossing the on-screen part of the orbit:
-  // these orbits are so much bigger than the screen (on phones above all) that the lull above cannot slow them enough.
-  // Jupiter's and Uranus's windows interlock (their periods are 1:2), so they get longer ones. The start phases come from
-  // the timeline search: at 1440x900 and 390x844, one of Jupiter..Neptune is wholly on screen (not behind the sun, clear of
-  // the bio) at every 0.1 s of the cycle, two or more about 90% of the time, and all five together for about 7-8 minutes
-  // of each cycle (where arrivals land). Changing a size, diag or linger needs a new search.
-  { id: 'jupiter', name: 'JUPITER', scene: 'outer', diag: 0.2, period: 200, start: 46, linger: 0.8, spin: 6,
+  // the outer scene. diag = where the orbit crosses the screen diagonal seen from the outer camera position
+  { id: 'jupiter', name: 'JUPITER', scene: 'outer', diag: 0.2, speed: 13.5, start: 46, spin: 6,
     colorAt: (lon, lat) => { const v = Math.sin(lat * 9 + 0.6) + 0.35 * Math.sin(lat * 23); return v > 0.7 ? [234, 216, 182] : v > -0.3 ? [200, 154, 104] : [170, 100, 64]; },
     moons: [
       { ra: 1.6, period: 6, phase: 0.4, r: 1.2, color: [236, 214, 120] },     // Io
@@ -80,23 +77,23 @@ const BODIES = [
       { ra: 2.7, period: 15, phase: 4.1, r: 1.6, color: [176, 164, 150] },    // Ganymede
       { ra: 3.4, period: 26, phase: 5.3, r: 1.5, color: [130, 120, 110] },    // Callisto
     ] },
-  { id: 'saturn', name: 'SATURN', scene: 'outer', diag: 0.34, period: 300, start: 20, linger: 0.5, spin: 7,
+  { id: 'saturn', name: 'SATURN', scene: 'outer', diag: 0.34, speed: 12, start: 20, spin: 7,
     colorAt: (lon, lat) => (Math.sin(lat * 8) + 0.3 * Math.sin(lat * 19) > 0.2 ? [226, 200, 142] : [196, 166, 110]), rings: 26.7,
     moons: [
       { ra: 2.7, period: 14, phase: 1.1, r: 1.1, color: [196, 196, 200] },    // Rhea (beyond the rings)
       { ra: 3.5, period: 24, phase: 3.9, r: 1.6, color: [226, 176, 92] },     // Titan
     ] },
-  { id: 'uranus', name: 'URANUS', scene: 'outer', diag: 0.48, period: 400, start: 45, linger: 0.75, spin: 10,
+  { id: 'uranus', name: 'URANUS', scene: 'outer', diag: 0.48, speed: 11, start: 45, spin: 10,
     colorAt: (lon, lat) => (Math.sin(lat * 5 + 1) > 0.85 ? [170, 226, 230] : [148, 212, 222]),
     moons: [                                                                   // in Uranus's equator plane: on their side
       { ra: 2.2, period: 12, phase: 0.6, r: 1.2, color: [200, 196, 196], incl: 97.8 },    // Titania
       { ra: 2.8, period: 18, phase: 3.4, r: 1.2, color: [180, 172, 168], incl: 97.8 },    // Oberon
     ] },
-  { id: 'neptune', name: 'NEPTUNE', scene: 'outer', diag: 0.62, period: 500, start: 147, linger: 0.5, spin: 9,
+  { id: 'neptune', name: 'NEPTUNE', scene: 'outer', diag: 0.62, speed: 10, start: 147, spin: 9,
     colorAt: (lon, lat) => (Math.sin(3 * lon + 4 * lat) * Math.cos(2 * lat) > 0.75 ? [222, 232, 250] : Math.sin(lat * 6) > 0.4 ? [44, 76, 196] : [58, 98, 220]),
     moons: [{ ra: 2.3, period: 11, phase: 2.0, r: 1.4, color: [214, 206, 200], incl: 157 }] },    // Triton: backwards
   // Pluto and Charon circle a shared point between them (bary: Charon's share of the distance is 1 - bary), so Pluto wobbles
-  { id: 'pluto', name: 'PLUTO', scene: 'outer', diag: 0.76, period: 600, start: 155, linger: 0.5, spin: 30,
+  { id: 'pluto', name: 'PLUTO', scene: 'outer', diag: 0.76, speed: 9, start: 155, spin: 30,
     colorAt: (lon, lat) => (Math.sin(2 * lon + 0.5) * Math.cos(2 * lat) > 0.3 ? [238, 226, 206] : [176, 154, 132]),
     moons: [{ ra: 4.4, period: 16, phase: 0, r: 1.1, color: [176, 170, 166], bary: 0.3 }] },
 ];
@@ -105,12 +102,15 @@ const isOuter = (b) => b.scene === 'outer';
 /* ------------------------------------------------------------------ *
  *  Buffer + drawing helpers
  * ------------------------------------------------------------------ */
-let W = 1, H = 1, D = 1, PX = 4;
+// The world is laid out in page 4's frame: W x H art pixels is page 4's screen (the sun, the orbits, the close-ups and the
+// visibility checks all use it). The buffer adds TOP rows above it for the hackerfab screen, where the same world simply
+// continues, so page-4 row y is buffer row y + TOP. Drawing is limited each frame to the rows on screen, YMIN..YMAX.
+let W = 1, H = 1, D = 1, PX = 4, TOP = 0, BH = 1;
+let YMIN = 0, YMAX = 1;
 let img, buf;
 let dimIdx = new Uint32Array(0), dimK = new Float32Array(0);   // pixels to darken behind the text, and by how much
 let dimFull = new Float32Array(0);                          // per-pixel brightness left behind the text (1 = untouched)
 let dimMask = new Uint8Array(0);                              // the dimmed zone around the text (includes a soft margin)
-let bioSum = new Int32Array(0);                             // prefix sums of the bio's own text boxes (the outer planets keep off them)
 let bioBottom = 0;                                          // the bio's lowest text line (art px)
 let textMask = new Uint8Array(0);
 let textSum = new Int32Array(0);                              // prefix sums of textMask (the text lines plus a small margin, where labels must not go): is a rectangle free of text? in O(1)
@@ -122,7 +122,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
 function plot(x, y, c) {
   x = Math.round(x);
   y = Math.round(y);
-  if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = c;
+  if (x >= 0 && x < W && y >= -TOP && y < H) buf[(y + TOP) * W + x] = c;
 }
 
 // a tiny body: one pixel, a 2x2 block, or (the larger Moon) a 3x3 block whose four corner pixels are dimmed so it reads round
@@ -152,9 +152,9 @@ function sphere(cx0, cy0, R, rot, colorAt, lx, ly, lz, bright, alpha = 1) {
       if (alpha >= 1) plot(x, y, col);
       else {                                                // blend over whatever is already there
         const xi = Math.round(x), yi = Math.round(y);
-        if (xi >= 0 && xi < W && yi >= 0 && yi < H) {
-          const o = buf[yi * W + xi];
-          buf[yi * W + xi] = rgb((o & 255) * (1 - alpha) + (col & 255) * alpha, ((o >> 8) & 255) * (1 - alpha) + ((col >> 8) & 255) * alpha, ((o >> 16) & 255) * (1 - alpha) + ((col >> 16) & 255) * alpha);
+        if (xi >= 0 && xi < W && yi >= -TOP && yi < H) {
+          const o = buf[(yi + TOP) * W + xi];
+          buf[(yi + TOP) * W + xi] = rgb((o & 255) * (1 - alpha) + (col & 255) * alpha, ((o >> 8) & 255) * (1 - alpha) + ((col >> 8) & 255) * alpha, ((o >> 16) & 255) * (1 - alpha) + ((col >> 16) & 255) * alpha);
         }
       }
     }
@@ -166,7 +166,7 @@ const HALO_COLORS = [[74, 36, 0], [140, 74, 4], [206, 120, 8], [250, 176, 20]];
 
 function sun(sx, sy, R) {
   const Rh = R * HALO;
-  const x0 = Math.max(0, Math.floor(sx - Rh)), y0 = Math.max(0, Math.floor(sy - Rh));
+  const x0 = Math.max(0, Math.floor(sx - Rh)), y0 = Math.max(-TOP, Math.floor(sy - Rh));
   const x1 = Math.min(W - 1, Math.ceil(sx + Rh)), y1 = Math.min(H - 1, Math.ceil(sy + Rh));
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
@@ -175,12 +175,12 @@ function sun(sx, sy, R) {
       const g = (BAYER[((y & 3) << 2) | (x & 3)] + 0.5) / 16 - 0.5;
       if (d <= R) {                                       // the disc: flat bands with dithered granulation
         const t = d / R + g * 0.16;
-        buf[y * W + x] = t < 0.45 ? rgb(255, 246, 150) : t < 0.8 ? rgb(255, 218, 52) : rgb(255, 176, 22);
+        buf[(y + TOP) * W + x] = t < 0.45 ? rgb(255, 246, 150) : t < 0.8 ? rgb(255, 218, 52) : rgb(255, 176, 22);
       } else {                                            // stepped halo, ordered-dithered so its edges stay blocky
         const v = Math.pow(1 - (d - R) / (Rh - R), 1.6) * 4;
         const base = Math.floor(v);
         const idx = base + (v - base > g + 0.5 ? 1 : 0);
-        if (idx > 0) buf[y * W + x] = rgb(...HALO_COLORS[Math.min(3, idx - 1)]);
+        if (idx > 0) buf[(y + TOP) * W + x] = rgb(...HALO_COLORS[Math.min(3, idx - 1)]);
       }
     }
   }
@@ -229,7 +229,6 @@ const SE = Math.sin(ELEV), CE = Math.cos(ELEV);
 let cx = 0, cy = 0, F = 1;                  // where the camera's target lands on screen (the inner scene's sun), and the focal length
 let orbitR = [], beltR = 1, rSun = 1;       // world orbit radii, belt radius, sun's screen radius (inner camera)
 let kuiperR = [1, 1];                       // the Kuiper belt's inner and outer world radius
-let dwell = BODIES.map(() => 0);            // per planet: the angle at the middle of its on-screen arc (where it lingers)
 const CAM_IN = { px: 0, pz: 0, d: 1, f: 1 };  // (f is set by layout())
 let camOut = { px: 0, pz: 0, d: 1, f: 1 };
 let cam = CAM_IN;
@@ -313,7 +312,8 @@ function solveOuter() {
     return Math.hypot(camOut.px + g.X, camOut.pz + g.Z);
   };
   BODIES.forEach((b, i) => { if (isOuter(b)) orbitR[i] = radiusAt(b.diag, top); });
-  kuiperR = KUIPER_BAND.map((f) => radiusAt(f, 0));
+  const rPluto = orbitR[BODIES.findIndex((b) => b.id === 'pluto')];
+  kuiperR = KUIPER_BAND.map((f) => f * rPluto);
 }
 
 // one solar system: every orbit is centred on the sun and lies in the shared plane (Mercury's 7 degrees aside), and the
@@ -363,120 +363,56 @@ function layout() {
   solveOuter();
   assertOrbits();
   starAnchor = groundRel(W / 2, H / 2, F) || { X: 0, Z: 0 };   // the world point under the screen centre (inner camera)
-  // each planet lingers at the middle of the largest stretch of its orbit that is on screen (seen from its own scene)
-  dwell = BODIES.map((b, i) => {
-    setCam(camFor(b));
-    let best = [0, 0], from = null;
-    for (let d = 0; d <= 720; d++) {
-      const v = planetState(i, ((d % 360) * Math.PI) / 180).visible;
-      if (v && from === null) from = d;
-      if ((!v || d === 720) && from !== null) { if (d - from > best[1]) best = [from, d - from]; from = null; }
-    }
-    if (b.linger) lingerTab[i] = lingerTable(b.linger, ((best[1] / 2) * Math.PI) / 180);
-    return (((best[0] + best[1] / 2) % 360) * Math.PI) / 180;
-  });
-  // the Kuiper band's stretch on screen (seen from the outer camera), with a margin so specks drift in from off screen
+  // the Kuiper ring as the outer camera sees it: its nearest and farthest depth on the canvas (for its specks' brightness),
+  // and where the named ones go: spots on the band that are clear of the text, spread along it
   setCam(camOut);
   {
-    const rm = (kuiperR[0] + kuiperR[1]) / 2, on = [];
     let zn = Infinity, zf = 0;
-    for (let d = 0; d < 1440; d++) {
-      const a = (d / 1440) * TAU;
-      for (const r of [kuiperR[0], rm, kuiperR[1]]) {
-        const [sx, sy, zv] = project(r * Math.cos(a), 0, -r * Math.sin(a));
-        if (zv > NEAR_CLIP && sx > -8 && sy > -8 && sx < W + 8 && sy < H + 8) { on.push(a); zn = Math.min(zn, zv); zf = Math.max(zf, zv); break; }
-      }
-    }
-    // the on-screen angles form one run (possibly across 0): find its ends
-    let lo = 0, hi = 0;
-    if (on.length) {
-      const sorted = on.slice().sort((p, q) => p - q);
-      let gap = 0, at = 0;
-      for (let k = 0; k < sorted.length; k++) { const nx = k + 1 < sorted.length ? sorted[k + 1] : sorted[0] + TAU; if (nx - sorted[k] > gap) { gap = nx - sorted[k]; at = k; } }
-      lo = sorted[(at + 1) % sorted.length]; hi = sorted[at]; if (hi < lo) hi += TAU;
-    }
-    kuiperSpan = [lo - 0.02, hi + 0.02];
-    kuiperZv = [zn, zf];
-    // the named ones go where they and their names are clear of the text, spread along that clear stretch
     const textAt = (x, y, w, h) => {
-      const S = W + 1, ax = Math.max(0, Math.floor(x)), ay = Math.max(0, Math.floor(y)), bx = Math.min(W, Math.ceil(x + w)), by = Math.min(H, Math.ceil(y + h));
-      return bx > ax && by > ay && textSum.length === S * (H + 1) && textSum[by * S + bx] - textSum[ay * S + bx] - textSum[by * S + ax] + textSum[ay * S + ax] > 0;
+      const S = W + 1, ax = Math.max(0, Math.floor(x)), ay = Math.max(0, Math.floor(y) + TOP), bx = Math.min(W, Math.ceil(x + w)), by = Math.min(BH, Math.ceil(y + h) + TOP);
+      return bx > ax && by > ay && textSum.length === S * (BH + 1) && textSum[by * S + bx] - textSum[ay * S + bx] - textSum[by * S + ax] + textSum[ay * S + ax] > 0;
     };
-    const clear = [], under = [];                           // [u, f, x, y] spots on the band on screen: clear of text, or behind it
-    const span = kuiperSpan[1] - kuiperSpan[0];
-    for (let f = 0.05; f <= 0.95; f += 0.1) {
+    // [a, f, x, y] spots on the band on the canvas: clear of text and seen from both cameras, clear (the inner camera does not
+    // see it), or behind text
+    const both = [], clear = [], under = [];
+    for (let f = 0.25; f <= 0.75; f += 0.1) {
       const r = kuiperR[0] + (kuiperR[1] - kuiperR[0]) * f;
-      for (let u = 0.02; u < 0.98; u += 0.01) {
-        const a = kuiperSpan[0] + u * span, [sx, sy, zv] = project(r * Math.cos(a), 0, -r * Math.sin(a));
-        if (zv > NEAR_CLIP && sx > 24 && sx < W - 24 && sy > 12 && sy < H - 12) (textAt(sx - 22, sy - 10, 44, 14) ? under : clear).push([u, f, sx, sy]);
+      for (let d = 0; d < 1440; d++) {
+        const a = (d / 1440) * TAU, [sx, sy, zv] = project(r * Math.cos(a), 0, -r * Math.sin(a));
+        if (zv <= NEAR_CLIP || sx < 0 || sx > W || sy < -TOP || sy > H) continue;
+        zn = Math.min(zn, zv); zf = Math.max(zf, zv);
+        if (!(sx > 24 && sx < W - 24 && sy > -TOP + 12 && sy < H - 12 && !behindWafer(sx, sy))) continue;
+        // the ring shows in both views: a spot is clear only if the inner camera also sees it clear of the text (or not at all)
+        setCam(CAM_IN);
+        const [ix, iy, iz] = project(r * Math.cos(a), 0, -r * Math.sin(a));
+        setCam(camOut);
+        const inSeen = iz > NEAR_CLIP && ix > -4 && ix < W + 4 && iy > -TOP - 4 && iy < H + 4;
+        const inOk = !inSeen || (ix > 24 && ix < W - 24 && iy > -TOP + 12 && iy < H - 12 && !behindWafer(ix, iy) && !textAt(ix - 22, iy - 10, 44, 14));
+        (!inOk || textAt(sx - 22, sy - 10, 44, 14) ? under : inSeen ? both : clear).push([a, f, sx, sy]);
       }
     }
-    clear.sort((p, q) => p[2] - q[2]);                      // left to right, then spread the three along it
+    kuiperZv = zn < zf ? [zn, zf] : [1, 2];
+    for (const list of [both, clear, under]) list.sort((p, q) => p[2] - q[2]);      // left to right, then spread the three along it
     const taken = [];
-    under.sort((p, q) => p[2] - q[2]);
     KUIPER_NAMED.forEach((m, k) => {
       // a clear spot if there is one left (spread along the clear stretch), otherwise one behind the text (its name then
       // finds the nearest clear spot and a leader joins them)
-      for (const list of [clear, under]) {
+      for (const list of [both, clear, under]) {
         const want = Math.floor(((k + 0.5) / KUIPER_NAMED.length) * list.length);
         for (let d = 0; d < list.length; d++) {
           for (const j of [want + d, want - d]) {
             const c = list[j];
             if (!c || taken.some((q) => Math.hypot(q[2] - c[2], q[3] - c[3]) < Math.min(26, 0.14 * W))) continue;
-            m.u = c[0]; m.f = c[1]; taken.push(c); d = list.length; break;
+            m.a = c[0]; m.f = c[1]; taken.push(c); d = list.length; break;
           }
         }
         if (taken.length > k) break;
       }
     });
   }
-  arrivals = arrivalMoments();
+  buildKuiper();
   setCam(sceneCam());
   checkSizes();
-}
-
-// moments in the outer scene's cycle when all five of its bodies are on screen (clear of the bio) for ARRIVE_MIN_S or
-// longer: [start, end] in seconds. Arriving in the outer scene jumps its clock (unseen, off screen) to one of these.
-const OUTER_CYCLE = 6000;
-let arrivals = [];
-function arrivalMoments() {
-  const out = [], idx = BODIES.map((b, i) => (isOuter(b) ? i : -1)).filter((i) => i >= 0), step = 0.5;
-  let from = null;
-  for (let t = 0; t <= OUTER_CYCLE; t += step) {
-    const all = t < OUTER_CYCLE && idx.every((i) => planetState(i, angleAt(i, t, startRad[i])).visible);
-    if (all && from === null) from = t;
-    if (!all && from !== null) { if (t - from >= ARRIVE_MIN_S) out.push([from, t - step]); from = null; }
-  }
-  if (!out.length) console.warn('solar: no moment in the outer cycle has all five bodies in view');
-  return out;
-}
-// how far to jump the outer clock when a switch to the outer position starts (lead = the switch's length), so that all
-// five outer bodies are in view on arrival. Bodies already on screen must not move: the jump is then a whole number of
-// their orbital periods (Jupiter alone: 200 s), so they end up exactly where they were. Returns 0 when no jump works.
-let jumpOut = 0;                              // all the jumps so far (spins, moons and belt specks run on clockOut - jumpOut)
-function arrivalJump(now, lead, lockedPeriods) {
-  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
-  const step = lockedPeriods.reduce((a, p) => (a * p) / gcd(a, p), 1);
-  const idx = BODIES.map((b, i) => (isOuter(b) ? i : -1)).filter((i) => i >= 0), keep = cam;
-  const allUp = (T) => idx.every((i) => planetState(i, angleAt(i, T, startRad[i])).visible);
-  setCam(camOut);
-  let best = 0;
-  if (step > 1) {
-    for (let k = 0; k * step < OUTER_CYCLE; k++) {
-      const T = now + k * step + lead;
-      if (allUp(T) && allUp(T + ARRIVE_MIN_S / 2)) { best = k * step; break; }
-    }
-  } else {
-    const base = Math.floor(now / OUTER_CYCLE) * OUTER_CYCLE;
-    outer: for (const cyc of [base, base + OUTER_CYCLE]) {
-      for (const [a, b] of arrivals) {
-        const land = cyc + a + Math.min(1, (b - a) / 3);      // a moment in, so all five stay up a while after arriving
-        if (land - lead >= now) { best = land - lead - now; break outer; }
-      }
-    }
-  }
-  setCam(keep);
-  return best;
 }
 
 // the size rules (SIZES): warn if one is broken at this screen size
@@ -499,53 +435,17 @@ const project = (x, h, z) => {
 const NEAR_CLIP = 0.05;                     // closer than this (or behind the camera) is not drawn
 
 /* ------------------------------------------------------------------ *
- *  Planet state (a pure function of time, shared by drawing, hit-testing and the visibility checks)
+ *  Planet state (a pure function of the planet's angle on its orbit, shared by drawing, hit-testing and isOnScreen)
  * ------------------------------------------------------------------ */
 // the facts and detail-view settings for each planet live in js/planets.js, keyed by id
 const PLANET_DATA = Object.fromEntries((window.BODY_DATA || []).map((p) => [p.id, p]));
 // besides the planets, the Sun and the two belts open a close-up view too
 const SUN_ID = 'sun', BELT_ID = 'asteroid-belt', KUIPER_ID = 'kuiper-belt';
 const openable = (id) => BODIES.some((b) => b.id === id) || id === SUN_ID || id === BELT_ID || id === KUIPER_ID;
-// which scene a body lives in (the asteroid belt is in both: null)
-const sceneOf = (id) => { const b = BODIES.find((q) => q.id === id); return b ? (isOuter(b) ? 'outer' : 'inner') : id === KUIPER_ID ? 'outer' : id === SUN_ID ? 'inner' : null; };
-const startRad = BODIES.map((b) => (b.start * Math.PI) / 180);
+// which scene a body lives in (the two belts are in both: null)
+const sceneOf = (id) => { const b = BODIES.find((q) => q.id === id); return b ? (isOuter(b) ? 'outer' : 'inner') : id === SUN_ID ? 'inner' : null; };
 const vminPx = () => Math.min(W, H) / 100;                  // one vmin, in art pixels
 const planetR0 = (b) => Math.max(1, (SIZES[b.id] * vminPx()) / 2);    // art-pixel radius, from SIZES (the same everywhere)
-
-// the planet's angle at time t, given its starting phase m0 (radians): uniform motion, slowed near its dwell angle
-function angleAt(i, t, m0) {
-  const b = BODIES[i], M = m0 + (TAU * t) / b.period;
-  if (b.linger && lingerTab[i]) {                         // the outer planets: look the angle up in their linger table
-    const tab = lingerTab[i], n = tab.length - 1;
-    let x = (M - dwell[i]) / TAU + 0.5;
-    const lap = Math.floor(x);
-    x = (x - lap) * n;
-    const k = Math.min(n - 1, Math.floor(x));
-    return dwell[i] + lap * TAU + tab[k] + (tab[k + 1] - tab[k]) * (x - k);
-  }
-  return M - 2 * b.lull * Math.sin(M - dwell[i]);
-}
-
-// a planet that spends `share` of each lap on an arc of half-width h (radians) around its dwell angle. The time spent per
-// unit angle is 1 + K inside the arc, easing back to 1 over a short ramp outside it, with K solved so the arc gets exactly
-// its share. Returns u (the offset from the dwell angle, -pi..pi) at evenly spaced moments of the lap.
-let lingerTab = [];
-function lingerTable(share, h) {
-  h = Math.max(0.02, Math.min(Math.PI - 0.1, h));
-  const RAMP = Math.min(0.1, 0.25 * h), N = 2048;             // a short arc gets a short ramp, so it can still get its share
-  const K = Math.max(0, (2 * h - TAU * share) / (share * (2 * h + RAMP) - 2 * h));
-  const rho = (u) => { const a = Math.abs(u); return 1 + K * (a <= h ? 1 : a < h + RAMP ? 0.5 + 0.5 * Math.cos((Math.PI * (a - h)) / RAMP) : 0); };
-  const us = [], cum = [0];                                  // cumulative time across the lap
-  for (let j = 0; j <= N; j++) us.push(-Math.PI + (TAU * j) / N);
-  for (let j = 1; j <= N; j++) cum.push(cum[j - 1] + (rho(us[j - 1]) + rho(us[j])) / 2);
-  const total = cum[N], tab = new Float32Array(N + 1);
-  for (let j = 0, k = 0; j <= N; j++) {                      // invert: the angle reached at each moment
-    const want = (total * j) / N;
-    while (k < N - 1 && cum[k + 1] < want) k++;
-    tab[j] = us[k] + (us[k + 1] - us[k]) * ((want - cum[k]) / (cum[k + 1] - cum[k] || 1));
-  }
-  return tab;
-}
 
 // a planet's real 3D position at angle phi: [x, height, z, z0]. z0 is its position in its own orbital plane (positive =
 // near side); a tilted plane (incl) rotates about the screen's horizontal axis so the near side rises
@@ -563,11 +463,170 @@ function planetState(i, phi) {
   const near = clamp01(0.5 + z0 / (2 * r));                 // 0 = far side of its orbit, 1 = near side
   const hidden = zv > sunZv && Math.hypot(sx - sunX, sy - sunY) < sunR;     // behind the sun's disc
   const clipped = zv < 0.25;                                // (nearly) behind the camera: not drawn
-  const inView = !clipped && sx >= R && sx <= W - R && sy >= R && sy <= H - R;     // the whole planet is inside the viewport
-  // the outer planets only count as in view when they are clear of the bio, so they never linger behind the text
-  const underBio = isOuter(b) && inView && boxHitsBio(sx - R, sy - R, 2 * R, 2 * R);
-  return { i, b, x, h, z, sx, sy, zv, R, near, hidden, clipped, inView, underBio, visible: inView && !hidden && !underBio, active: true };
+  return { i, b, x, h, z, sx, sy, zv, R, near, hidden, clipped, active: true };
 }
+
+/* ------------------------------------------------------------------ *
+ *  Motion, driven by what is on screen
+ * ------------------------------------------------------------------ */
+// each planet: its angle on its orbit, and what it is doing: 'moving' (on screen, at its speed), 'waiting' (wholly hidden
+// just before the point where it comes back into view, until `wait`), 'emerging' (moving at its speed towards that point)
+// or 'parked' (no part of its orbit is on screen from here; looked at again every second). simT is the running time the
+// waits are measured on.
+const motion = BODIES.map((b) => ({ phi: (b.start * Math.PI) / 180, state: 'moving', wait: 0, since: 0, on: false, aimedAt: 0 }));
+let simT = 0, labelOff = [];                 // labelOff[i]: planet i's name as drawn last frame, relative to it (art px)
+let seedM = 7;
+const randM = () => (seedM = (seedM * 1664525 + 1013904223) >>> 0) / 4294967296;
+const REENTER_WAIT = [3, 6];                 // seconds a hidden planet waits before coming back out
+const EMPTY_WAIT = 0.8;                      // ... or at most this long when no planet at all is on screen
+
+// how far round a planet its moons (or Saturn's rings) reach, in art px
+function bodyReach(i, R) {
+  const b = BODIES[i];
+  let reach = b.rings ? (SIZES.saturnRings / SIZES.saturn) * R : R;
+  for (const m of b.moons) reach = Math.max(reach, R * m.ra + 2 + m.r);
+  return reach;
+}
+// planet i at angle phi as a box in css viewport px: its disc, its moons' reach and (when it is drawn) its name. The canvas
+// is low-resolution and scaled up, so art pixels become css pixels by scaling, plus the canvas's offset in the page, minus
+// the scroll. All from cached sizes and the scroll position: no layout reads.
+function bodyBox(i, phi = motion[i].phi, withLabel = true) {
+  const p = planetState(i, phi), reach = bodyReach(i, p.R);
+  const qx = lay.w / W, qy = lay.h / BH, ox = lay.left - window.scrollX, oy = lay.top - window.scrollY;
+  const lo = (withLabel && labelOff[i]) || [0, 0, 0, 0];
+  const x0 = Math.min(p.sx - reach, p.sx + lo[0]), x1 = Math.max(p.sx + reach, p.sx + lo[0] + lo[2]);
+  const y0 = Math.min(p.sy - reach, p.sy + lo[1]), y1 = Math.max(p.sy + reach, p.sy + lo[1] + lo[3]);
+  return { p, left: x0 * qx + ox, right: x1 * qx + ox, top: (y0 + TOP) * qy + oy, bottom: (y1 + TOP) * qy + oy };
+}
+// is any part of planet i (its disc, moons and name) inside the browser window, and not wholly hidden behind the wafer or
+// the sun's disc? (Without its name: whether the body itself shows, which decides if it gets a name at all.)
+function isOnScreen(i, phi = motion[i].phi, withLabel = true) {
+  const bx = bodyBox(i, phi, withLabel), p = bx.p;
+  if (p.clipped || bx.right < 0 || bx.left > window.innerWidth || bx.bottom < 0 || bx.top > window.innerHeight) return false;
+  if (p.zv > sunZv && Math.hypot(p.sx - sunX, p.sy - sunY) + p.R < sunR) return false;          // wholly behind the sun
+  let covered = behindWafer(p.sx, p.sy);                                                     // wholly behind the wafer
+  for (let k = 0; covered && k < 8; k++) covered = behindWafer(p.sx + p.R * Math.cos((k * TAU) / 8), p.sy + p.R * Math.sin((k * TAU) / 8));
+  return !covered;
+}
+// the angle that moves planet i about `px` css px along its orbit on screen from angle phi (perspective included)
+function angleFor(i, phi, px) {
+  const a = planetState(i, phi), b = planetState(i, phi + 1e-3);
+  const perRad = Math.hypot((b.sx - a.sx) * (lay.w / W), (b.sy - a.sy) * (lay.h / BH)) / 1e-3;
+  return Math.min(0.05, px / Math.max(perRad, 1e-6));
+}
+// the next point ahead on planet i's orbit where it comes into view: the last angle before it does (still hidden), or null
+// when no part of its orbit is on screen. A half-degree scan, then a bisection down to the edge.
+function entryAhead(i, phi) {
+  const step = TAU / 720;
+  for (let k = 1; k <= 720; k++) {
+    if (!isOnScreen(i, phi + k * step, false)) continue;
+    let lo = phi + (k - 1) * step, hi = phi + k * step;
+    for (let j = 0; j < 14; j++) { const mid = (lo + hi) / 2; if (isOnScreen(i, mid, false)) hi = mid; else lo = mid; }
+    return lo;
+  }
+  return null;
+}
+const reenterWait = () => REENTER_WAIT[0] + (REENTER_WAIT[1] - REENTER_WAIT[0]) * randM();
+// one step of the motion rules (the camera at rest, no close-up open):
+//  - a planet that is even partly on screen always moves at its own speed: nothing visible is ever sped up
+//  - one that has gone wholly out of view jumps at once (unseen) to just before its next entry point, waits REENTER_WAIT,
+//    then moves out at its speed, from behind the wafer or a screen edge, wherever its orbit comes back into view
+//  - when no planet is on screen at all, the one due soonest comes out within EMPTY_WAIT
+function stepPlanets(dt) {
+  simT += dt;
+  let anyOn = false;
+  BODIES.forEach((b, i) => { motion[i].on = isOnScreen(i); if (motion[i].on) anyOn = true; });
+  BODIES.forEach((b, i) => {
+    const m = motion[i];
+    // a planet on its way back in, aimed at the screen as it was: if the page has scrolled since, aim again (unseen)
+    if ((m.state === 'waiting' || m.state === 'emerging') && !m.on && Math.abs(window.scrollY - m.aimedAt) > 1) {
+      const e = entryAhead(i, m.phi);
+      if (e === null) { m.state = 'parked'; m.wait = simT + 1; return; }
+      m.phi = e; m.aimedAt = window.scrollY;
+      if (m.state === 'emerging') m.since = simT;
+    }
+    if (m.state === 'parked') {
+      if (m.on) m.state = 'moving';
+      else {
+        if (simT < m.wait) return;
+        const e = entryAhead(i, m.phi);
+        if (e === null) { m.wait = simT + 1; return; }
+        m.phi = e; m.state = 'waiting'; m.wait = simT + reenterWait(); m.aimedAt = window.scrollY; labelOff[i] = null;
+        return;
+      }
+    }
+    if (m.state === 'waiting') {
+      if (m.on) m.state = 'moving';                          // in view (the screen moved under it): never stand still
+      else if (simT < m.wait) return;
+      else { m.state = 'emerging'; m.since = simT; }
+    }
+    if (m.state === 'emerging' && m.on) m.state = 'moving';
+    if (m.state === 'moving' && !m.on) {                     // just went wholly out of view: jump ahead (unseen) and wait
+      const e = entryAhead(i, m.phi);
+      if (e === null) { m.state = 'parked'; m.wait = simT + 1; return; }
+      m.phi = e; m.state = 'waiting'; m.wait = simT + reenterWait(); m.aimedAt = window.scrollY; labelOff[i] = null;   // (its old name spot no longer applies)
+      return;
+    }
+    if (m.state === 'emerging' && simT - m.since > 3) { m.state = 'moving'; return; }   // the view changed under it: look again
+    m.phi += angleFor(i, m.phi, b.speed * dt);
+  });
+  if (!anyOn) {                                              // nothing on screen: bring the next one out within a second
+    let next = null;
+    for (const m of motion) if (m.state === 'waiting' && (!next || m.wait < next.wait)) next = m;
+    if (next && next.wait > simT + EMPTY_WAIT) next.wait = simT + EMPTY_WAIT;
+  }
+}
+// reduced motion: nothing moves, so a planet that is hidden is placed in the middle of the longest stretch of its orbit
+// where its whole disc is in the window and clear of the wafer and the sun (failing that, where any of it is on screen)
+function placeStill() {
+  const step = TAU / 720;
+  const whole = (i, phi) => {
+    const bx = bodyBox(i, phi, false), p = bx.p, qx = lay.w / W, r = p.R * qx, x = (bx.left + bx.right) / 2, y = (bx.top + bx.bottom) / 2;
+    return !p.clipped && !p.hidden && x - r >= 0 && x + r <= window.innerWidth && y - r >= 0 && y + r <= window.innerHeight && !behindWafer(p.sx, p.sy) && isOnScreen(i, phi, false);
+  };
+  BODIES.forEach((b, i) => {
+    if (isOnScreen(i, motion[i].phi, false) && whole(i, motion[i].phi)) return;
+    let best = null, run = null;
+    for (let k = 0; k <= 720; k++) {
+      const ok = k < 720 && whole(i, k * step);
+      if (ok && !run) run = [k, k];
+      else if (ok) run[1] = k;
+      else if (run) { if (!best || run[1] - run[0] > best[1] - best[0]) best = run; run = null; }
+    }
+    if (best) { motion[i].phi = ((best[0] + best[1]) / 2) * step; return; }
+    if (isOnScreen(i)) return;
+    const e = entryAhead(i, motion[i].phi);
+    if (e !== null) motion[i].phi = e + step;
+  });
+}
+
+// ?debug in the address: a box round every planet as isOnScreen sees it (green on screen, red hidden), with its state
+const DEBUG = new URLSearchParams(location.search).has('debug');
+let debugCanvas = null;
+function drawDebug() {
+  if (!debugCanvas) {
+    debugCanvas = document.createElement('canvas');
+    debugCanvas.setAttribute('aria-hidden', 'true');
+    debugCanvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2147483647';
+    document.body.appendChild(debugCanvas);
+  }
+  const dpr = window.devicePixelRatio || 1, w = window.innerWidth, h = window.innerHeight;
+  if (debugCanvas.width !== Math.round(w * dpr) || debugCanvas.height !== Math.round(h * dpr)) { debugCanvas.width = Math.round(w * dpr); debugCanvas.height = Math.round(h * dpr); }
+  const g = debugCanvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  g.font = '11px monospace';
+  BODIES.forEach((b, i) => {
+    const bx = bodyBox(i), on = isOnScreen(i), m = motion[i];
+    g.strokeStyle = g.fillStyle = on ? '#2bff6a' : '#ff3b3b';
+    g.lineWidth = 2;
+    g.strokeRect(bx.left, bx.top, bx.right - bx.left, bx.bottom - bx.top);
+    const st = m.state === 'waiting' ? 'waiting ' + Math.max(0, m.wait - simT).toFixed(1) + 's' : m.state;
+    const tx = Math.min(Math.max(bx.left, 4), w - 150), ty = Math.min(Math.max(bx.top - 4, 12), h - 4);
+    g.fillText(b.name + ' ' + st, tx, ty);
+  });
+}
+
 
 /* ------------------------------------------------------------------ *
  *  Asteroid belt: a ring of points with a little random thickness above and below the plane
@@ -583,26 +642,99 @@ const asteroids = Array.from({ length: BELT_COUNT }, () => ({
   shade: SHADES[Math.floor(rand() * 3)],
   dash: rand() < 0.25,
 }));
-// the Kuiper belt: a dense band of icy specks, spread only along the stretch of the band that is on screen (kuiperSpan,
-// set by layout()), drifting slowly and wrapping round within it (its own random stream, so the belt above is unchanged)
+// the Kuiper belt: a real ring of icy bodies round the same sun, on the same plane, each slowly orbiting it (slower
+// further out, as Kepler has it). Across the band they thin out softly towards both edges, so it has no hard edge
+// anywhere. Only the stretch of the ring that can ever be on the canvas (kuiperArc, from either camera position or on the
+// way between them, plus a margin) is filled, at a density set by how the asteroid belt looks (buildKuiper); a body that
+// drifts out of one end of that stretch comes back in at the other, off screen
 let seedK = 29;
 const randK = () => (seedK = (seedK * 1664525 + 1013904223) >>> 0) / 4294967296;
 const ICE = [[150, 178, 214], [190, 210, 236], [232, 238, 250]];        // pale blue to white
-const kuiperRocks = Array.from({ length: KUIPER_COUNT }, () => ({
-  u: randK(),                                   // where along the on-screen arc (0..1)
-  du: 1 / (420 + randK() * 380),                // drift, in arcs per second
-  f: randK(),                                   // where across the band (0 inner edge, 1 outer edge)
-  hk: (randK() + randK() + randK() - 1.5) * 0.05,
-  shade: ICE[Math.floor(randK() * 3)],
-  big: randK() < 0.35,                          // may be drawn 2x2 when near
-}));
-// the named ones in the overview: slightly larger dots, always labelled
+let kuiperRocks = [], kuiperArc = [0, TAU];
+let kuiperStats = null;                         // how the count was chosen (for tests)
+const kuiperRock = (lo, span) => {
+  const f = (randK() + randK() + randK()) / 3;  // where across the band (0 inner edge, 1 outer edge): densest in the middle
+  return {
+    a0: lo + randK() * span,
+    f,
+    w: (TAU / (6000 + randK() * 1500)) * Math.pow((KUIPER_BAND[0] + (KUIPER_BAND[1] - KUIPER_BAND[0]) * f) / KUIPER_BAND[0], -1.5),
+    hk: (randK() + randK() + randK() - 1.5) * 0.03,     // height above or below the plane, relative to the radius
+    edge: Math.min(1, Math.min(f, 1 - f) / 0.15),       // dimmer near the band's edges
+    shade: ICE[Math.floor(randK() * 3)],
+  };
+};
+// where a body is at time t: its angle wraps round within the arc
+const kuiperAngle = (s, t) => { const span = kuiperArc[1] - kuiperArc[0]; return kuiperArc[0] + ((((s.a0 + s.w * t - kuiperArc[0]) % span) + span) % span); };
+
+// fill the arc: first find it, then measure how dense the asteroid belt looks (specks per pixel of its band, from the
+// inner camera) and how dense a trial Kuiper fill looks (from the outer camera), and scale the fill to KUIPER_DENSITY x the
+// belt, kept within KUIPER_SEEN bodies on the screen that shows the most of it
+function buildKuiper() {
+  const keep = cam, onCanvas = (sx, sy, zv) => zv > NEAR_CLIP && sx > -8 && sx < W + 8 && sy > -TOP - 8 && sy < H + 8;
+  const rs = [kuiperR[0], (kuiperR[0] + kuiperR[1]) / 2, kuiperR[1]], on = [];
+  for (let d = 0; d < 2880; d++) {
+    const a = (d / 2880) * TAU;
+    let seen = false;
+    for (let e = 0; e <= 1 && !seen; e += 0.1) {
+      setCam(camAt(e));
+      for (const r of rs) { const [sx, sy, zv] = project(r * Math.cos(a), 0, -r * Math.sin(a)); if (onCanvas(sx, sy, zv)) { seen = true; break; } }
+    }
+    if (seen) on.push(a);
+  }
+  // the angles seen form one run (possibly across 0): its ends, plus a margin so bodies wrap round off screen
+  let lo = 0, hi = TAU;
+  if (on.length && on.length < 2880) {
+    let gap = 0, at = 0;
+    for (let k = 0; k < on.length; k++) { const nx = k + 1 < on.length ? on[k + 1] : on[0] + TAU; if (nx - on[k] > gap) { gap = nx - on[k]; at = k; } }
+    lo = on[(at + 1) % on.length] - 0.04; hi = on[at] + 0.04; if (hi <= lo) hi += TAU;
+  }
+  kuiperArc = [lo, Math.min(hi, lo + TAU)];
+  const span = kuiperArc[1] - kuiperArc[0];
+  // the asteroid belt's look: specks on the canvas per pixel of its band, from the inner camera
+  setCam(CAM_IN);
+  let beltIn = 0, beltArea = 0;
+  for (const a of asteroids) {
+    const r = beltR * a.rk, [sx, sy, zv] = project(r * Math.cos(a.a0), r * a.hk, -r * Math.sin(a.a0));
+    if (zv > NEAR_CLIP && sx >= 0 && sx < W && sy >= 0 && sy < H && Math.hypot(sx - sunX, sy - sunY) > sunR) beltIn++;
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (Math.hypot(x - sunX, y - sunY) <= sunR) continue;
+    if (Math.abs(radiusThrough(x + 0.5, y + 0.5, F, CAM_IN) - beltR) <= beltR * BELT_WIDTH) beltArea++;
+  }
+  // a trial fill, seen from the outer camera: how dense it looks, and how many land on each section's screen
+  setCam(camOut);
+  const trialN = Math.max(200, Math.round(span * 800));
+  seedK = 29;
+  const trial = Array.from({ length: trialN }, () => kuiperRock(kuiperArc[0], span));
+  let kIn = 0, kTop = 0, kPage = 0, kArea = 0;
+  for (const s of trial) {
+    const r = kuiperR[0] + (kuiperR[1] - kuiperR[0]) * s.f, [sx, sy, zv] = project(r * Math.cos(s.a0), r * s.hk, -r * Math.sin(s.a0));
+    if (!(zv > NEAR_CLIP && sx >= 0 && sx < W && sy >= -TOP && sy < H)) continue;
+    kIn++; if (sy < 0) kTop++; else kPage++;
+  }
+  for (let y = -TOP; y < H; y++) for (let x = 0; x < W; x++) {
+    const rho = radiusThrough(x + 0.5, y + 0.5, F, camOut);
+    if (rho >= kuiperR[0] && rho <= kuiperR[1]) kArea++;
+  }
+  const beltDensity = beltArea ? beltIn / beltArea : 0, trialDensity = kArea ? kIn / kArea : 0;
+  let scaleBy = trialDensity > 0 ? (KUIPER_DENSITY * beltDensity) / trialDensity : 1;
+  const best = Math.max(kTop, kPage) * scaleBy;                      // bodies on the screen that shows most of the band
+  const wantSeen = best;
+  if (best > 0 && best < KUIPER_SEEN[0]) scaleBy *= KUIPER_SEEN[0] / best;
+  else if (best > KUIPER_SEEN[1]) scaleBy *= KUIPER_SEEN[1] / best;
+  const n = Math.max(0, Math.min(40000, Math.round(trialN * scaleBy)));
+  seedK = 29;
+  kuiperRocks = Array.from({ length: n }, () => kuiperRock(kuiperArc[0], span));
+  kuiperStats = { arc: kuiperArc.slice(), count: n, beltDensity, densityTarget: KUIPER_DENSITY * beltDensity, seenAtTarget: Math.round(wantSeen), seenTop: Math.round(kTop * (n / trialN)), seenPage: Math.round(kPage * (n / trialN)) };
+  setCam(keep);
+}
+// the named ones in the overview: slightly larger bodies inside the band, always labelled
 const KUIPER_NAMED = [
-  { name: 'HAUMEA', u: 0.3, f: 0.55, color: [236, 240, 248], shape: 'long' },
-  { name: 'MAKEMAKE', u: 0.55, f: 0.3, color: [226, 196, 170], shape: 'dot' },
-  { name: 'ARROKOTH', u: 0.78, f: 0.7, color: [196, 120, 96], shape: 'pair' },
-];   // (layout() moves each to a stretch of the band that is clear of the page text, so its name has room)
-let kuiperSpan = [0, 0], kuiperZv = [1, 1];     // the band's on-screen angles, and its nearest / farthest depth
+  { name: 'HAUMEA', a: 0, f: 0.55, color: [236, 240, 248], shape: 'long' },
+  { name: 'MAKEMAKE', a: 0, f: 0.3, color: [226, 196, 170], shape: 'dot' },
+  { name: 'ARROKOTH', a: 0, f: 0.7, color: [196, 120, 96], shape: 'pair' },
+];   // (layout() parks each on a stretch of the band that is clear of the page text, so its name has room)
+let kuiperZv = [1, 2];                          // the ring's nearest and farthest depth on the canvas (outer camera)
 
 // dim background stars (they slide at STAR_PARALLAX of the scenery's speed, wrapping round the screen)
 let seedS = 5;
@@ -643,6 +775,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 let cssW = 1, cssH = 1, colRight = 0;       // canvas size and the right edge of the text column, in css px
 let labelInfo = { visible: 0, labelled: 0, missed: [] };   // per frame: planets in view vs planets that got a name
 let lastLabels = [];                        // the labels drawn in the latest frame: [x, y, w, h, text] in art pixels
+let lastKuiper = { kRocks: [], kNamed: [] };  // the Kuiper bodies drawn in the latest frame (for tests)
 const nameOf = (t) => (t === 'SUN' ? 'SUN' : t === 'BELT' ? 'ASTEROID BELT' : t === 'KUIPER' ? 'KUIPER BELT' : t ? t.name : null);
 
 /* ------------------------------------------------------------------ *
@@ -656,11 +789,13 @@ let fadeBuf = null;
 let sunSeen = null;                         // the sun as drawn this frame (for its label), or null
 const SATURN_RING = [214, 194, 148];
 let sunSkips = 0;                            // line pixels kept off the sun's disc this frame (for tests)
+let discs = [];                              // the planets (and Charon) as drawn this frame: [x, y, r]; no name may sit on one
 function scenery(t, tOut) {
   const far = [], near = [];
   const sunOn = sunZv > NEAR_CLIP, sr2 = (sunR + 0.5) * (sunR + 0.5);
   const onSun = (sx, sy) => sunOn && (sx - sunX) * (sx - sunX) + (sy - sunY) * (sy - sunY) < sr2;
   sunSkips = 0;                // depth-sorted bodies, drawn around the sun
+  discs = [];
 
   // orbit lines: one dotted ellipse per planet, far half before the sun, near half after it
   const farLines = [], nearLines = [];
@@ -671,7 +806,7 @@ function scenery(t, tOut) {
     for (let k = 0; k < n; k++) {
       const [x, h, z, z0] = orbitPoint(i, (k / n) * TAU);
       const [sx, sy, zv] = project(x, h, z);
-      if (zv < NEAR_CLIP || sx < -1 || sy < -1 || sx > W || sy > H) continue;
+      if (zv < NEAR_CLIP || sx < -1 || sy < YMIN - 1 || sx > W || sy > YMAX) continue;
       if (onSun(sx, sy)) { sunSkips++; continue; }
       (zv > sunZv ? farLines : nearLines).push(sx, sy, lineFor(clamp01(0.5 + z0 / (2 * r))));
     }
@@ -683,12 +818,12 @@ function scenery(t, tOut) {
   // asteroid belt (a little brighter while it is hovered or its button has keyboard focus). It is in both scenes, so it
   // drifts whenever either one is shown
   const beltOn = (hovered === 'BELT' || focusedBody === 'BELT') && !view.id;
-  const farRocks = [], nearRocks = [], tb = t + tOut - jumpOut;      // (arrival jumps never move the specks)
+  const farRocks = [], nearRocks = [], tb = t + tOut;
   for (const s of asteroids) {
     const a = s.a0 + s.w * tb, r = beltR * s.rk;
     const x = r * Math.cos(a), z = -r * Math.sin(a), h = r * s.hk;
     const [sx, sy, zv] = project(x, h, z);
-    if (zv < NEAR_CLIP || sx < -2 || sy < -2 || sx > W || sy > H || onSun(sx, sy)) continue;
+    if (zv < NEAR_CLIP || sx < -2 || sy < YMIN - 2 || sx > W || sy > YMAX || onSun(sx, sy)) continue;
     (z < 0 ? farRocks : nearRocks).push([sx, sy, s, 0.5 + 0.5 * clamp01(0.5 + z / (2 * r))]);
   }
   const plotRocks = (arr, on) => {
@@ -699,49 +834,46 @@ function scenery(t, tOut) {
     }
   };
 
-  // the Kuiper belt: icy specks along the arc the outer camera sees; nearer ones are bigger and brighter
+  // the Kuiper belt: the ring seen by the same camera as the orbits; nearer bodies are bigger and brighter
   const kuiperOn = (hovered === 'KUIPER' || focusedBody === 'KUIPER') && !view.id;
   const kRocks = [], kNamed = [];
   {
-    const span = kuiperSpan[1] - kuiperSpan[0], zn = kuiperZv[0], zf = kuiperZv[1];
-    const at = (u, f, hk) => {
-      const a = kuiperSpan[0] + (((u % 1) + 1) % 1) * span, r = kuiperR[0] + (kuiperR[1] - kuiperR[0]) * f;
-      const x = r * Math.cos(a), z = -r * Math.sin(a);
-      return project(x, r * hk, z);
+    const zn = kuiperZv[0], zf = kuiperZv[1], tk = t + tOut;      // in both scenes, like the asteroid belt
+    const at = (a, f, hk) => {
+      const r = kuiperR[0] + (kuiperR[1] - kuiperR[0]) * f;
+      return project(r * Math.cos(a), r * hk, -r * Math.sin(a));
     };
     for (const s of kuiperRocks) {
-      const [sx, sy, zv] = at(s.u + s.du * (tOut - jumpOut), s.f, s.hk);
-      if (zv < NEAR_CLIP || sx < -2 || sy < -2 || sx > W || sy > H || onSun(sx, sy)) continue;
+      const [sx, sy, zv] = at(kuiperAngle(s, tk), s.f, s.hk);
+      if (zv < NEAR_CLIP || sx < -2 || sy < YMIN - 2 || sx > W || sy > YMAX || onSun(sx, sy)) continue;
       kRocks.push([sx, sy, s, clamp01((zf - zv) / (zf - zn || 1))]);
     }
     for (const m of KUIPER_NAMED) {
-      const [sx, sy, zv] = at(m.u, m.f, 0);
-      if (zv >= NEAR_CLIP && sx > -4 && sy > -4 && sx < W + 4 && sy < H + 4) kNamed.push({ m, sx, sy, R: 2 });
+      const [sx, sy, zv] = at(m.a, m.f, 0);
+      if (zv >= NEAR_CLIP && sx > -4 && sy > YMIN - 4 && sx < W + 4 && sy < YMAX + 4) kNamed.push({ m, sx, sy, R: 2 });
     }
   }
   const plotIce = (on) => {
-    for (const [sx, sy, s, nr] of kRocks) {
-      const c = scale(s.shade, (0.45 + 0.55 * nr) * (on ? 1.25 : 1));
+    for (const [sx, sy, s, nr] of kRocks) {               // nr: 0 farthest, 1 nearest
+      const c = scale(s.shade, (0.3 + 0.7 * nr) * (0.35 + 0.65 * s.edge) * (on ? 1.25 : 1));
       plot(sx, sy, c);
-      if (s.big && nr > 0.55) { plot(sx + 1, sy, c); plot(sx, sy + 1, c); plot(sx + 1, sy + 1, c); }
+      if (nr > 0.6) { plot(sx + 1, sy, c); plot(sx, sy + 1, c); plot(sx + 1, sy + 1, c); }     // near ones: 2 px
     }
     for (const k of kNamed) {
-      const c = scale(k.m.color, on ? 1.15 : 1), x = Math.round(k.sx), y = Math.round(k.sy);
-      if (k.m.shape === 'long') { for (let d = -1; d <= 1; d++) plot(x + d, y, c); }                       // Haumea: elongated
-      else if (k.m.shape === 'pair') { plot(x, y, c); plot(x + 1, y, scale(k.m.color, 0.8)); }        // Arrokoth: two lobes
+      const c = scale(k.m.color, on ? 1.15 : 1), d = scale(k.m.color, 0.75), x = Math.round(k.sx), y = Math.round(k.sy);
+      if (k.m.shape === 'long') { for (let i = -2; i <= 1; i++) { plot(x + i, y, c); if (i > -2 && i < 1) plot(x + i, y + 1, d); } }   // Haumea: elongated
+      else if (k.m.shape === 'pair') { plot(x, y, c); plot(x, y + 1, c); plot(x + 1, y + 1, d); plot(x + 2, y + 1, d); plot(x + 2, y + 2, d); }   // Arrokoth: two lobes
       else { plot(x, y, c); plot(x + 1, y, c); plot(x, y + 1, c); plot(x + 1, y + 1, c); }
     }
   };
 
   // planets and their moons become depth-sorted bodies
   BODIES.forEach((b, i) => {
-    const p = planetState(i, angleAt(i, isOuter(b) ? tOut : t, startRad[i]));
+    const p = planetState(i, motion[i].phi);
     placed[i] = p;
     const m = Math.max(16, p.R * 2.5);
-    if (p.clipped || p.sx < -m || p.sy < -m || p.sx > W + m || p.sy > H + m) return;
-    // tp: the body's own spin and its moons. An arrival jump moves the outer bodies along their orbits only (and only the
-    // ones off screen, see arrivalJump), so these run on the jump-free clock
-    const tp = isOuter(b) ? tOut - jumpOut : t;
+    if (p.clipped || p.sx < -m || p.sy < YMIN - m || p.sx > W + m || p.sy > YMAX + m) return;
+    const tp = isOuter(b) ? tOut : t;                         // the body's own spin and its moons
     const Rw = (planetR0(b) / cam.f) * cam.d;               // planet radius in world units
     const kpx = p.R / Rw;                                   // screen pixels per world unit at the planet
     let px = p.x, pz = p.z;
@@ -764,6 +896,9 @@ function scenery(t, tOut) {
       return { m, th, ra, sx, sy, zv, near: clamp01(0.5 + oz / (2 * ra)) };
     });
     const [bx, by, bz] = project(p.x + wob[0], p.h + wob[1], p.z + wob[2]);
+    // Pluto is drawn off its orbit point (it circles the shared point with Charon): its name and hit test follow the body
+    p.sx = bx; p.sy = by;
+    discs.push([bx, by, p.R]);
     // light from the sun (at the origin), in screen space: (towards the sun, y down, towards the viewer)
     const lx = -px, ly = p.h * CE - pz * SE, lz = -(p.h * SE + pz * CE);
     // moon orbits: dotted ellipses round the planet (or the shared point), far half behind it and near half in front
@@ -815,6 +950,7 @@ function scenery(t, tOut) {
     }
     for (const k of moons) {
       const r = k.m.bary ? p.R / 2 : k.m.r;                  // Charon: half Pluto's size
+      if (k.m.bary) discs.push([k.sx, k.sy, r / k.zv]);
       const mb = { zv: k.zv, draw: () => speck(k.sx, k.sy, r / k.zv, scale(k.m.color, brightFor(k.near))) };
       (isOuter(b) || k.zv > sunZv ? far : near).push(mb);
     }
@@ -825,7 +961,7 @@ function scenery(t, tOut) {
   plotIce(kuiperOn);
   plotRocks(farRocks, beltOn);
   far.sort((a, b) => b.zv - a.zv).forEach((o) => o.draw());
-  if (sunOn) { sun(sunX, sunY, sunR); if (sunX + sunR > 0 && sunY + sunR > 0 && sunX - sunR < W && sunY - sunR < H) sunSeen = { x: sunX, y: sunY, r: sunR }; }
+  if (sunOn) { sun(sunX, sunY, sunR); if (sunX + sunR > 0 && sunY + sunR > YMIN && sunX - sunR < W && sunY - sunR < YMAX) sunSeen = { x: sunX, y: sunY, r: sunR }; }
   plotLines(nearLines, ORBIT_BASE);
   plotRocks(nearRocks, beltOn);
   near.sort((a, b) => b.zv - a.zv).forEach((o) => o.draw());
@@ -833,7 +969,7 @@ function scenery(t, tOut) {
 }
 
 // a body that is not drawn this frame (its scene is off screen)
-const idle = (i) => ({ i, b: BODIES[i], sx: -1e4, sy: -1e4, R: 0, zv: 1, active: false, hidden: true, clipped: true, inView: false, visible: false });
+const idle = (i) => ({ i, b: BODIES[i], sx: -1e4, sy: -1e4, R: 0, zv: 1, active: false, hidden: true, clipped: true });
 
 // the stars slide at STAR_PARALLAX of the scenery's speed: 30% of how far the ground under the screen centre has moved
 // on screen since the inner position, wrapping round the screen
@@ -841,9 +977,9 @@ let starAnchor = { X: 0, Z: 0 };
 function stars() {
   const [ax, ay] = project(starAnchor.X, 0, starAnchor.Z);
   const ox = (ax - W / 2) * STAR_PARALLAX, oy = (ay - H / 2) * STAR_PARALLAX;
-  for (const s of STARS) {
-    const x = Math.round((((s.x * W + ox) % W) + W) % W), y = Math.round((((s.y * H + oy) % H) + H) % H);
-    if (x >= 0 && x < W && y >= 0 && y < H && buf[y * W + x] === (0xff000000 | 0)) buf[y * W + x] = s.c;
+  for (const s of STARS) {                 // one field over both screens, the same density everywhere
+    const x = Math.round((((s.x * W + ox) % W) + W) % W), y = Math.round((((s.y * BH + oy) % BH) + BH) % BH);
+    if (x >= 0 && x < W && y >= 0 && y < BH && buf[y * W + x] === (0xff000000 | 0)) buf[y * W + x] = s.c;
   }
 }
 
@@ -853,7 +989,13 @@ function draw(t, tOut = clockOut) {
   placed = BODIES.map((b, i) => idle(i));
   sunSeen = null;
   let sc;
-  buf.fill(0xff000000);
+  // the rows on screen (from the cached canvas position and the scroll offset: no layout read), plus half a screen each
+  // way so a fast scroll never uncovers rows from an older frame. A one-off redraw (no loop running) draws everything.
+  const vt = window.scrollY - lay.top, qy = lay.h / BH, pad = Math.ceil((0.5 * window.innerHeight) / qy);
+  let r0 = Math.max(0, Math.min(BH, Math.floor(vt / qy) - pad)), r1 = Math.max(r0, Math.min(BH, Math.ceil((vt + window.innerHeight) / qy) + pad));
+  if (!running) { r0 = 0; r1 = BH; }
+  YMIN = r0 - TOP; YMAX = r1 - TOP;
+  buf.fill(0xff000000, r0 * W, r1 * W);
   if (reduceMotion && sceneMoving()) {
     // reduced motion: no camera move; the same world seen from the two positions crossfades
     setCam(CAM_IN); stars(); scenery(t, tOut);
@@ -874,6 +1016,7 @@ function draw(t, tOut = clockOut) {
   }
   setCam(sceneCam());                       // hit tests, buttons and the zoom use the camera at rest
   const { farRocks, nearRocks, kRocks, kNamed, beltOn, kuiperOn } = sc;
+  lastKuiper = { kRocks, kNamed };
   const tgt = view.id ? targetState() : null, zoom = tgt ? easeInOut(view.t) : 0;
 
   // keep the background quiet behind the text
@@ -887,14 +1030,19 @@ function draw(t, tOut = clockOut) {
   const labelRects = [];
   const clearRect = (x0, y0, w, h, onSunOk = false) => {
     x0 = Math.round(x0); y0 = Math.round(y0);
-    if (x0 - 1 < 0 || y0 - 1 < 0 || x0 + w + 1 > W || y0 + h + 1 > H) return false;
+    if (x0 - 2 < 0 || y0 - 1 < -TOP || x0 + w + 2 > W || y0 + h + 1 > H) return false;      // inside the screen, never cut off
+    if (behindWafer(x0 + w / 2, y0 + h / 2)) return false;
     if (!onSunOk && sunSeen) {                             // names keep off the sun's disc (only its own name sits on it)
       const nx = Math.max(x0 - 1, Math.min(sunSeen.x, x0 + w + 1)), ny = Math.max(y0 - 1, Math.min(sunSeen.y, y0 + h + 1));
       if (Math.hypot(nx - sunSeen.x, ny - sunSeen.y) < sunSeen.r + 1) return false;
     }
-    const S = W + 1, ax = x0 - 1, ay = y0 - 1, bx = x0 + w + 1, by = y0 + h + 1;       // rectangle [ax, bx) x [ay, by)
+    const S = W + 1, ax = x0 - 1, ay = y0 - 1 + TOP, bx = x0 + w + 1, by = y0 + h + 1 + TOP;       // rectangle [ax, bx) x [ay, by), buffer rows
     if (textSum[by * S + bx] - textSum[ay * S + bx] - textSum[by * S + ax] + textSum[ay * S + ax] > 0) return false;
     for (const r of labelRects) if (x0 - 1 < r[0] + r[2] && x0 + w + 1 > r[0] && y0 - 1 < r[1] + r[3] && y0 + h + 1 > r[1]) return false;
+    for (const [dx, dy, dr] of discs) {                     // names sit beside a body, never on one
+      const nx = Math.max(x0 - 1, Math.min(dx, x0 + w + 1)), ny = Math.max(y0 - 1, Math.min(dy, y0 + h + 1));
+      if ((nx - dx) * (nx - dx) + (ny - dy) * (ny - dy) < (dr + 0.5) * (dr + 0.5)) return false;
+    }
     return true;
   };
   const putLabel = (str, x0, y0, color, backing = true) => {
@@ -904,10 +1052,25 @@ function draw(t, tOut = clockOut) {
     drawText(str, x0, y0, color);
     labelRects.push([x0, y0, w, h, str]);
   };
+  // a leader line from a body to a name placed away from it must not cross any text or the sun's disc either
+  const leaderClear = (p, x0, y0, w, h) => {
+    const tx = Math.max(x0, Math.min(p.sx, x0 + w)), ty = Math.max(y0, Math.min(p.sy, y0 + h));
+    const len = Math.hypot(tx - p.sx, ty - p.sy);
+    let out = false;                                        // (a body over text or the sun: the leader may start inside it)
+    for (let i = Math.ceil(p.R) + 2; i < len - 1; i += 1) {
+      const x = Math.round(p.sx + ((tx - p.sx) * i) / len), y = Math.round(p.sy + ((ty - p.sy) * i) / len) + TOP;
+      const onText = (x >= 0 && x < W && y >= 0 && y < BH && textMask[y * W + x] === 1) || (sunSeen !== null && Math.hypot(x - sunSeen.x, y - TOP - sunSeen.y) < sunSeen.r + 1);
+      if (onText && out) return false;
+      if (!onText) out = true;
+    }
+    return true;
+  };
   const LABEL_C = rgb(206, 206, 216), LABEL_HI = rgb(255, 255, 255), LEADER_C = rgb(120, 124, 140);
 
   labelInfo = { visible: 0, labelled: 0, moved: 0, missed: [] };
-  const named = placed.filter((p) => p.active && !p.clipped && p.sx >= 0 && p.sx <= W && p.sy >= 0 && p.sy <= H && !p.hidden)
+  labelOff = [];
+  // (a planet behind the wafer has no name: the wafer covers it)
+  const named = placed.filter((p) => p.active && !p.clipped && p.sx >= 0 && p.sx <= W && p.sy >= YMIN && p.sy <= YMAX && !p.hidden && !behindWafer(p.sx, p.sy) && (!running || isOnScreen(p.i, undefined, false)))
     .concat((kNamed || []).map((k) => ({ sx: k.sx, sy: k.sy, R: k.R, b: { name: k.m.name } })));
   for (const p of named) {
     labelInfo.visible++;
@@ -918,7 +1081,10 @@ function draw(t, tOut = clockOut) {
     // clear spot on rings around it, joined to the planet by a dotted leader line (when it sits on top of the text)
     let spot = null, far = false;
     const near = [
-      [p.sx - w / 2, p.sy - g - h], [p.sx - w / 2, p.sy + g], [p.sx + g, p.sy - 2], [p.sx - g - w, p.sy - 2],
+      [p.sx - w / 2, p.sy - g - h], [p.sx - w / 2, p.sy - g - h - 4], [p.sx - w / 2, p.sy - g - h - 8],
+      // at a screen edge: still above, slid inwards while it stays over the body, then over on the body's other side
+      [Math.min(Math.max(p.sx - w / 2, 2), W - w - 2), p.sy - g - h], p.sx - w / 2 < 2 ? [p.sx + g * 0.7, p.sy - g * 0.7 - h] : [p.sx - g * 0.7 - w, p.sy - g * 0.7 - h],
+      [p.sx - w / 2, p.sy + g], [p.sx + g, p.sy - 2], [p.sx - g - w, p.sy - 2],
       [p.sx + g * 0.7, p.sy - g * 0.7 - h], [p.sx - g * 0.7 - w, p.sy - g * 0.7 - h], [p.sx + g * 0.7, p.sy + g * 0.7], [p.sx - g * 0.7 - w, p.sy + g * 0.7],
     ];
     spot = near.find(([x0, y0]) => clearRect(x0, y0, w, h)) || null;
@@ -926,7 +1092,7 @@ function draw(t, tOut = clockOut) {
       for (const deg of RING_ANGLES) {
         const th = (deg * Math.PI) / 180, c = Math.cos(th), sn = Math.sin(th);
         const x0 = p.sx + c * (dist + (w / 2) * Math.abs(c)) - w / 2, y0 = p.sy + sn * (dist + (h / 2) * Math.abs(sn)) - h / 2;
-        if (clearRect(x0, y0, w, h)) { spot = [x0, y0]; far = true; break; }
+        if (clearRect(x0, y0, w, h) && leaderClear(p, x0, y0, w, h)) { spot = [x0, y0]; far = true; break; }
       }
     }
     if (!spot) {
@@ -937,9 +1103,14 @@ function draw(t, tOut = clockOut) {
       labelInfo.moved++;
       const tx = Math.max(spot[0], Math.min(p.sx, spot[0] + w)), ty = Math.max(spot[1], Math.min(p.sy, spot[1] + h));
       const len = Math.hypot(tx - p.sx, ty - p.sy), steps = Math.floor(len);
-      for (let i = Math.ceil(p.R) + 2; i < steps - 1; i += 2) plot(p.sx + ((tx - p.sx) * i) / len, p.sy + ((ty - p.sy) * i) / len, LEADER_C);
+      for (let i = Math.ceil(p.R) + 2; i < steps - 1; i += 2) {
+        const lx = p.sx + ((tx - p.sx) * i) / len, ly = p.sy + ((ty - p.sy) * i) / len;
+        if (sunSeen && Math.hypot(lx - sunSeen.x, ly - sunSeen.y) < sunSeen.r + 0.5) continue;     // like the orbit lines, never on the sun
+        plot(lx, ly, LEADER_C);
+      }
     }
     putLabel(p.b.name, spot[0], spot[1], on ? LABEL_HI : LABEL_C);
+    if (p.i !== undefined) labelOff[p.i] = [Math.round(spot[0]) - p.sx, Math.round(spot[1]) - p.sy, textWidth(p.b.name), 5];
     labelInfo.labelled++;
   }
 
@@ -948,7 +1119,7 @@ function draw(t, tOut = clockOut) {
     const { x, y, r } = sunSeen;
     if ((hovered === 'SUN' || focusedBody === 'SUN') && !view.id) ring(x, y, r + 4, RING_C);
     const w = textWidth('SUN');
-    if (x - w / 2 >= 1 && x + w / 2 <= W - 1 && y >= 3 && y <= H - 3 && clearRect(x - w / 2, y - 2, w, 5, true)) {
+    if (x - w / 2 >= 1 && x + w / 2 <= W - 1 && y >= -TOP + 3 && y <= H - 3 && clearRect(x - w / 2, y - 2, w, 5, true)) {
       putLabel('SUN', x - w / 2, y - 2, rgb(122, 52, 0), false);
     }
   }
@@ -961,7 +1132,7 @@ function draw(t, tOut = clockOut) {
     mx /= pts.length; my /= pts.length;
     const w = textWidth(str), h = 5;
     let best = null, bd = Infinity;
-    for (let y0 = Math.max(2, Math.floor(my) - 50); y0 < Math.min(H - h - 2, my + 50); y0 += 2) {
+    for (let y0 = Math.max(-TOP + 2, Math.floor(my) - 50); y0 < Math.min(H - h - 2, my + 50); y0 += 2) {
       for (let x0 = Math.max(2, Math.floor(mx) - 90); x0 < Math.min(W - w - 2, mx + 90); x0 += 2) {
         const d = Math.hypot(x0 + w / 2 - mx, y0 + h / 2 - my);
         if (d < bd && clearRect(x0, y0, w, h)) { bd = d; best = [x0, y0]; }
@@ -982,9 +1153,13 @@ function draw(t, tOut = clockOut) {
     // the overview (sun, orbits, belt, other planets) fades into the planet's background, which is dithered to match the pixel style
     ensureBackground(tgt, e);
     if (bgBuf) {
-      const keep = 1 - zoom;
-      for (let i = 0; i < buf.length; i++) {
-        const c = buf[i], b = bgBuf[i], k = zoom * (1 - 0.4 * (1 - dimFull[i]));      // only a gentle dim behind text: the gradient is already dark there
+      const keep = 1 - zoom, top = TOP * W;
+      for (let i = 0; i < top; i++) {                        // the hackerfab rows: the overview fades to black (no seam above)
+        const c = buf[i];
+        buf[i] = rgb((c & 255) * keep, ((c >> 8) & 255) * keep, ((c >> 16) & 255) * keep);
+      }
+      for (let i = top; i < buf.length; i++) {
+        const c = buf[i], b = bgBuf[i - top], k = zoom * (1 - 0.4 * (1 - dimFull[i]));      // only a gentle dim behind text: the gradient is already dark there
         buf[i] = rgb(Math.min(255, (c & 255) * keep + (b & 255) * k), Math.min(255, ((c >> 8) & 255) * keep + ((b >> 8) & 255) * k), Math.min(255, ((c >> 16) & 255) * keep + ((b >> 16) & 255) * k));
       }
     }
@@ -997,7 +1172,8 @@ function draw(t, tOut = clockOut) {
   }
 
   updateButtons();
-  ctx.putImageData(img, 0, 0);
+  if (r1 > r0) ctx.putImageData(img, 0, 0, 0, r0, W, r1 - r0);       // upload just the rows on screen
+  if (DEBUG) drawDebug();
 }
 
 function ring(sx, sy, r, c) {
@@ -1012,72 +1188,127 @@ function ring(sx, sy, r, c) {
 function measureText() {
   const cr = canvas.getBoundingClientRect();
   if (!cr.width) return;
-  cssW = cr.width; cssH = cr.height;
+  cssW = cr.width; cssH = page.clientHeight || cssH;     // page 4's screen (the canvas itself is two screens tall)
   colRight = 0;                                    // right edge of the widest line of the bio text (set below)
-  const k = new Float32Array(W * H).fill(1);
-  const rects = [], bioRects = [];
-  const walker = document.createTreeWalker(page, NodeFilter.SHOW_TEXT);
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    if (!n.nodeValue.trim() || n.parentElement.closest('canvas, script, style')) continue;
-    if (n.parentElement.closest('.planet-info')) continue;              // the callouts carry their own pixel outline: no dimming
-    if (n.parentElement.closest('[hidden]') || getComputedStyle(n.parentElement).visibility === 'hidden') continue;
-    // on phones the bio is faded out while the view opens or closes (it moves under the facts once the zoom is done)
-    if (stackHidden() && n.parentElement.closest('.page4-text')) continue;
-    if (page.classList.contains('planet-open') && n.parentElement.closest('.page4-hint')) continue;          // faded out
-    if (viewMode() === 'phone' && page.classList.contains('planet-shown') && n.parentElement.closest('.page4-pluto, .page4-sun')) continue;
-    const range = document.createRange();
-    range.selectNodeContents(n);
-    for (const r of range.getClientRects()) {
-      rects.push(r);
-      if (n.parentElement.closest('.page4-text')) { colRight = Math.max(colRight, r.right - cr.left); bioRects.push(r); }
+  const qx = cr.width / W, qy = cr.height / BH;    // css px per art pixel; rows below are buffer rows (page-4 row + TOP)
+  const k = new Float32Array(W * BH).fill(1);
+  const rects = [], bioRects = [], solid = [];     // text lines; the bio's lines; non-text things labels keep off
+  const blocks = new Map();                        // the hackerfab screen's text, per block (one soft scrim each, no boxes)
+  const walk = (root, perBlock = false) => {
+    if (!root) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.nodeValue.trim() || n.parentElement.closest('canvas, script, style')) continue;
+      if (n.parentElement.closest('.planet-info')) continue;              // the callouts carry their own pixel outline: no dimming
+      if (n.parentElement.closest('[hidden]') || getComputedStyle(n.parentElement).visibility === 'hidden') continue;
+      // on phones the bio is faded out while the view opens or closes (it moves under the facts once the zoom is done)
+      if (stackHidden() && n.parentElement.closest('.page4-text')) continue;
+      if (page.classList.contains('planet-open') && n.parentElement.closest('.page4-hint')) continue;          // faded out
+      if (viewMode() === 'phone' && page.classList.contains('planet-shown') && n.parentElement.closest('.page4-pluto, .page4-sun')) continue;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      const blk = perBlock && (n.parentElement.closest('.hobbies-closing, .hobbies-brand a, .brand-note') || n.parentElement);
+      for (const r of range.getClientRects()) {
+        rects.push(r);
+        if (blk) { if (!blocks.has(blk)) blocks.set(blk, []); blocks.get(blk).push(r); continue; }
+        if (n.parentElement.closest('.page4-text')) { colRight = Math.max(colRight, r.right - cr.left); bioRects.push(r); }
+      }
     }
-  }
+  };
+  walk(page);
+  // the hackerfab screen's text sits over this canvas too: the heading, "our website" and "check it out!" each get one soft
+  // scrim (below), so planets passing behind dim gently instead of being cut off by boxes; the logo and the hand-drawn
+  // arrow only keep the planet names off them
+  const tail = space.querySelector('.hobbies-tail');
+  walk(tail, true);
+  if (tail) for (const el of tail.querySelectorAll('img, .brand-arrow path')) { const r = el.getBoundingClientRect(); if (r.width || r.height) solid.push(r); }
+  const box = (r, m) => [Math.max(0, Math.floor((r.left - cr.left) / qx) - m), Math.min(W - 1, Math.ceil((r.right - cr.left) / qx) + m),
+    Math.max(0, Math.floor((r.top - cr.top) / qy) - m), Math.min(BH - 1, Math.ceil((r.bottom - cr.top) / qy) + m)];
   const apply = (r, m, f) => {
-    const x0 = Math.max(0, Math.floor((r.left - cr.left) / PX) - m), x1 = Math.min(W - 1, Math.ceil((r.right - cr.left) / PX) + m);
-    const y0 = Math.max(0, Math.floor((r.top - cr.top) / PX) - m), y1 = Math.min(H - 1, Math.ceil((r.bottom - cr.top) / PX) + m);
+    const [x0, x1, y0, y1] = box(r, m);
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (f < k[y * W + x]) k[y * W + x] = f;
   };
-  for (const r of rects) apply(r, 4, Math.min(1, TEXT_DIM + 0.4));   // feathered margin
-  for (const r of rects) apply(r, 1, TEXT_DIM);                       // the text itself
+  const tailRects = new Set([...blocks.values()].flat());
+  for (const r of rects) if (!tailRects.has(r)) apply(r, 4, Math.min(1, TEXT_DIM + 0.4));   // feathered margin
+  for (const r of rects) if (!tailRects.has(r)) apply(r, 1, TEXT_DIM);                       // the text itself
+  // the scrims: darkest (SCRIM_DIM) over the block's lines, easing to untouched over SCRIM_FEATHER vmin beyond its edge
+  const fe = Math.max(2, (SCRIM_FEATHER * Math.min(cssW, cssH)) / 100 / qx);
+  for (const list of blocks.values()) {
+    const u = { left: Math.min(...list.map((r) => r.left)), right: Math.max(...list.map((r) => r.right)), top: Math.min(...list.map((r) => r.top)), bottom: Math.max(...list.map((r) => r.bottom)) };
+    const [x0, x1, y0, y1] = box(u, 0), m = Math.ceil(fe);
+    for (let y = Math.max(0, y0 - m); y <= Math.min(BH - 1, y1 + m); y++) {
+      for (let x = Math.max(0, x0 - m); x <= Math.min(W - 1, x1 + m); x++) {
+        const d = Math.hypot(Math.max(0, x0 - x, x - x1), Math.max(0, y0 - y, y - y1)) / fe;    // 0 inside, 1 at the feather's end
+        const f = SCRIM_DIM + (1 - SCRIM_DIM) * (d >= 1 ? 1 : d * d * (3 - 2 * d));
+        if (f < k[y * W + x]) k[y * W + x] = f;
+      }
+    }
+  }
   // where labels must not go: the text lines plus a small margin (and the bio's own lines, for the outer planets' arcs)
-  const mask = (list, m) => {
-    const out = new Uint8Array(W * H);
+  const mask = (list, m, rows) => {
+    const out = new Uint8Array(W * rows), off = rows === H ? TOP : 0;     // the bio's mask is in page-4 rows
     for (const r of list) {
-      const x0 = Math.max(0, Math.floor((r.left - cr.left) / PX) - m), x1 = Math.min(W - 1, Math.ceil((r.right - cr.left) / PX) + m);
-      const y0 = Math.max(0, Math.floor((r.top - cr.top) / PX) - m), y1 = Math.min(H - 1, Math.ceil((r.bottom - cr.top) / PX) + m);
-      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) out[y * W + x] = 1;
+      const [x0, x1, y0, y1] = box(r, m);
+      for (let y = Math.max(0, y0 - off); y <= Math.min(rows - 1, y1 - off); y++) for (let x = x0; x <= x1; x++) out[y * W + x] = 1;
     }
     return out;
   };
-  const sums = (m) => {
-    const out = new Int32Array((W + 1) * (H + 1));
-    for (let y = 0; y < H; y++) {
+  const sums = (m, rows) => {
+    const out = new Int32Array((W + 1) * (rows + 1));
+    for (let y = 0; y < rows; y++) {
       let row = 0;
       for (let x = 0; x < W; x++) { row += m[y * W + x]; out[(y + 1) * (W + 1) + x + 1] = out[y * (W + 1) + x + 1] + row; }
     }
     return out;
   };
-  textMask = mask(rects, 2);
-  textSum = sums(textMask);
-  if (!view.id) {                                       // the overview's bio (the outer planets' lingering arcs avoid it)
-    bioSum = sums(mask(bioRects, 1));
-    bioBottom = bioRects.length ? (Math.max(...bioRects.map((r) => r.bottom)) - cr.top) / PX : 0;
+  textMask = mask(rects.concat(solid), 2, BH);
+  textSum = sums(textMask, BH);
+  if (!view.id) {                                       // the overview's bio (the outer orbits on phones keep under it)
+    bioBottom = bioRects.length ? (Math.max(...bioRects.map((r) => r.bottom)) - cr.top) / qy - TOP : 0;
   }
   const idx = [];
-  dimMask = new Uint8Array(W * H);
+  dimMask = new Uint8Array(W * BH);
   for (let i = 0; i < k.length; i++) if (k[i] < 1) { idx.push(i); dimMask[i] = 1; }
   dimIdx = Uint32Array.from(idx);
   dimK = Float32Array.from(idx, (i) => k[i]);
   dimFull = k;
 }
-// does an art-pixel box overlap the bio's text?
-function boxHitsBio(x, y, w, h) {
-  if (bioSum.length !== (W + 1) * (H + 1)) return false;
-  const S = W + 1, ax = Math.max(0, Math.floor(x)), ay = Math.max(0, Math.floor(y)), bx = Math.min(W, Math.ceil(x + w)), by = Math.min(H, Math.ceil(y + h));
-  if (bx <= ax || by <= ay) return false;
-  return bioSum[by * S + bx] - bioSum[ay * S + bx] - bioSum[by * S + ax] + bioSum[ay * S + ax] > 0;
-}
 
+// where things are in the document, measured on resize only: the animation loop and the pointer handlers never read layout
+const lay = { left: 0, top: 0, w: 1, h: 1, inSpace: 0, page: 0 };   // the canvas (document px, size, offset in .space), page 4's top
+const docPos = (el) => { let x = 0, y = 0; for (let e = el; e; e = e.offsetParent) { x += e.offsetLeft; y += e.offsetTop; } return [x, y]; };
+function cacheOffsets() {
+  [lay.left, lay.top] = docPos(canvas);
+  lay.w = canvas.clientWidth; lay.h = canvas.clientHeight;
+  lay.inSpace = canvas.offsetTop;
+  lay.page = docPos(page)[1];
+}
+// a client point to page-4 art coordinates (y < 0 is up in the hackerfab screen)
+const toArt = (clientX, clientY) => [((clientX - (lay.left - window.scrollX)) / lay.w) * W, ((clientY - (lay.top - window.scrollY)) / lay.h) * BH - TOP];
+
+// the silicon wafer (in the screen above) covers part of this canvas: its outline, filled into a mask in buffer rows.
+// A planet behind it is not named, not hoverable and not clickable (it is still drawn: the wafer simply covers it)
+let waferMask = new Uint8Array(0);
+function buildWaferMask() {
+  const wc = document.querySelector('.wafer-canvas');
+  waferMask = new Uint8Array(W * BH);
+  if (!wc || !wc.waferOutline) return;
+  const [wl, wt] = docPos(wc), pts = wc.waferOutline().map((p) => [((wl + p.x - lay.left) / lay.w) * W, ((wt + p.y - lay.top) / lay.h) * BH]);
+  if (pts.length < 3) return;
+  for (let y = 0; y < BH; y++) {
+    const yc = y + 0.5, xs = [];
+    for (let k = 0; k < pts.length; k++) {
+      const [x1, y1] = pts[k], [x2, y2] = pts[(k + 1) % pts.length];
+      if ((y1 <= yc) !== (y2 <= yc)) xs.push(x1 + ((yc - y1) / (y2 - y1)) * (x2 - x1));
+    }
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.max(0, Math.ceil(xs[k])); x <= Math.min(W - 1, Math.floor(xs[k + 1])); x++) waferMask[y * W + x] = 1;
+  }
+}
+const behindWafer = (x, y) => {
+  const xi = Math.round(x), yi = Math.round(y) + TOP;
+  return xi >= 0 && xi < W && yi >= 0 && yi < BH && waferMask[yi * W + xi] === 1;
+};
 /* ------------------------------------------------------------------ *
  *  Sizing, pointer and loop
  * ------------------------------------------------------------------ */
@@ -1090,17 +1321,22 @@ function redraw() { if (buf && !running) draw(now()); }
 
 function resize() {
   const box = canvas.getBoundingClientRect();           // the real (possibly fractional) size, so the buffer always covers it
-  const cw = box.width, ch = box.height;
-  if (!cw || !ch) return;
+  const cw = box.width, ch = box.height, ph = page.clientHeight;
+  if (!cw || !ch || !ph) return;
   PX = cw <= 700 ? 3 : 4;                              // CSS pixels per art pixel
   W = Math.max(8, Math.ceil(cw / PX));
-  H = Math.max(8, Math.ceil(ch / PX));
+  H = Math.max(8, Math.ceil(ph / PX));                 // page 4's screen: the frame the whole world is laid out in
+  TOP = Math.max(0, Math.round((ch - ph) / (ph / H))); // the hackerfab screen above it, in the same rows
+  BH = TOP + H;
   D = Math.hypot(W, H);
   canvas.width = W;
-  canvas.height = H;
-  img = ctx.createImageData(W, H);
+  canvas.height = BH;
+  img = ctx.createImageData(W, BH);
   buf = new Uint32Array(img.data.buffer);
+  YMIN = -TOP; YMAX = H;
+  cacheOffsets();
   measureText();                                       // first, so the outer planets' arcs can keep off the bio
+  buildWaferMask();                                    // (and the Kuiper belt's named bodies off the wafer)
   layout();
   if (view.id) { measureBio(); measureInfo(); }
   measureText();
@@ -1220,10 +1456,12 @@ function frame(ts) {
   if (!visible) { running = false; lastTs = null; return; }   // nothing to draw while page 4 is off screen
   if (frozen) { lastTs = null; requestAnimationFrame(frame); return; }   // a test is inspecting one frame
   if (lastTs !== null && !view.id) {                        // paused while a view is open
-    // each part of the system moves while its camera position is in use or any of its bodies is on screen
-    const dt = Math.min(0.1, (ts - lastTs) / 1000), shown = (outer) => placed.some((p) => p.inView && isOuter(p.b) === outer);
-    if (scene.t < 1 || shown(false)) clock += dt;
-    if (scene.t > 0 || shown(true)) clockOut += dt;
+    // the clocks run the spins, moons and belts; the planets themselves move by the screen-driven rules (stepPlanets),
+    // which wait while the camera slides between the two views
+    const dt = Math.min(0.25, (ts - lastTs) / 1000);           // (a long stall still never jumps a planet far)
+    clock += dt;
+    clockOut += dt;
+    if (!sceneMoving()) stepPlanets(dt);
   }
   lastTs = ts;
   draw(clock);
@@ -1235,13 +1473,13 @@ function frame(ts) {
  * ------------------------------------------------------------------ */
 const btnBox = document.createElement('div');
 btnBox.className = 'planet-buttons';
-page.appendChild(btnBox);
+space.appendChild(btnBox);                           // over both screens (under their content), so planets up in the hackerfab screen have one too
 const buttons = BODIES.map((b) => {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'planet-btn';
   el.setAttribute('aria-label', 'Open ' + b.name);
-  el.addEventListener('click', (ev) => { ev.stopPropagation(); openView(b.id); });
+  el.addEventListener('click', (ev) => { ev.stopPropagation(); openFromOverview(b.id); });
   el.addEventListener('focus', () => { focusedBody = b; redraw(); });
   el.addEventListener('blur', () => { if (focusedBody === b) { focusedBody = null; redraw(); } });
   el.addEventListener('pointerenter', (ev) => { if (ev.pointerType !== 'touch') { hovered = b; redraw(); } });
@@ -1256,7 +1494,7 @@ const specials = [['SUN', SUN_ID, 'Open the Sun'], ['BELT', BELT_ID, 'Open the a
   el.type = 'button';
   el.className = 'planet-btn is-keyboard';
   el.setAttribute('aria-label', label);
-  el.addEventListener('click', (ev) => { ev.stopPropagation(); openView(id); });
+  el.addEventListener('click', (ev) => { ev.stopPropagation(); openFromOverview(id); });
   el.addEventListener('focus', () => { focusedBody = tag; redraw(); });
   el.addEventListener('blur', () => { if (focusedBody === tag) { focusedBody = null; redraw(); } });
   btnBox.appendChild(el);
@@ -1277,23 +1515,25 @@ page.appendChild(backLink);
 // flight between the scenes, and for the scene that is not shown
 function updateButtons() {
   const open = view.id !== null, still = !sceneMoving();
+  const qx = lay.w / W, qy = lay.h / BH, cssX = (x) => x * qx, cssY = (y) => lay.inSpace + (y + TOP) * qy;   // art px -> .space px
   btnBox.hidden = open && view.t >= 1;
   placed.forEach((p, i) => {
     const el = buttons[i];
-    const show = !open && still && p.active && !p.clipped && p.sx >= 0 && p.sx <= W && p.sy >= 0 && p.sy <= H && !p.hidden;
+    const show = !open && still && p.active && !p.clipped && !p.hidden && !behindWafer(p.sx, p.sy) && isOnScreen(i);
     if (el.hidden === show) el.hidden = !show;
     if (!show) return;
     const d = Math.max(44, (2 * p.R + 12) * PX);
     el.style.width = el.style.height = d + 'px';
-    el.style.transform = 'translate(' + (p.sx * PX - d / 2) + 'px,' + (p.sy * PX - d / 2) + 'px)';
+    el.style.transform = 'translate(' + (cssX(p.sx) - d / 2) + 'px,' + (cssY(p.sy) - d / 2) + 'px)';
   });
   // the Sun's button sits on its label; each belt's on the middle of its arc on screen
-  const at = (pt) => { const [sx, sy] = project(pt[0], pt[1], pt[2]); return [sx, sy, 44]; };
-  const spots = { SUN: [sunX, sunY, 48], BELT: at(defaultBeltPoint()), KUIPER: scene.t >= 1 ? at(defaultKuiperPoint()) : [0, 0, 44] };
-  const shown = { SUN: scene.t <= 0, BELT: true, KUIPER: scene.t >= 1 };
+  const spotOf = (pt) => { const [sx, sy] = project(pt[0], pt[1], pt[2]); return [sx, sy, 44]; };
+  const spots = { SUN: [sunX, sunY, 48], BELT: spotOf(defaultBeltPoint()), KUIPER: spotOf(defaultKuiperPoint()) };
+  const shown = { SUN: scene.t <= 0, BELT: true, KUIPER: true };
   for (const sp of specials) {
     const [sx, sy, d] = spots[sp.tag];
-    const x = Math.min(Math.max(sx * PX, d / 2), W * PX - d / 2), y = Math.min(Math.max(sy * PX, d / 2), H * PX - d / 2);
+    const top = sp.tag === 'KUIPER' ? -TOP : 0;           // the Kuiper ring runs up into the hackerfab screen too
+    const x = Math.min(Math.max(cssX(sx), d / 2), W * qx - d / 2), y = Math.min(Math.max(cssY(sy), cssY(top) + d / 2), cssY(H) - d / 2);
     sp.el.hidden = open || !still || !shown[sp.tag];
     sp.el.style.width = sp.el.style.height = d + 'px';
     sp.el.style.transform = 'translate(' + (x - d / 2) + 'px,' + (y - d / 2) + 'px)';
@@ -1324,28 +1564,30 @@ function ringPointUnder(sx, sy, r) {
 }
 const beltPointUnder = (sx, sy) => ringPointUnder(sx, sy, beltR);
 const kuiperMid = () => (kuiperR[0] + kuiperR[1]) / 2;
-function defaultRingPoint(r) {
+// the middle of the longest stretch of a ring on screen (rows from `top` down: the Kuiper ring may be on screen only in the
+// hackerfab screen, and never counts where it is behind the wafer)
+function defaultRingPoint(r, top = 4) {
   let run = [], best = [];
   for (let d = 0; d <= 720; d++) {
     const a = ((d % 360) * Math.PI) / 180, [sx, sy, zv] = project(r * Math.cos(a), 0, -r * Math.sin(a));
-    if (zv > NEAR_CLIP && sx > 4 && sy > 4 && sx < W - 4 && sy < H - 4 && d < 720) run.push(a);
+    if (zv > NEAR_CLIP && sx > 4 && sy > top && sx < W - 4 && sy < H - 4 && d < 720 && !behindWafer(sx, sy)) run.push(a);
     else { if (run.length > best.length) best = run; run = []; }
   }
   const a = best.length ? best[Math.floor(best.length / 2)] : (3 * Math.PI) / 4;
   return [r * Math.cos(a), 0, -r * Math.sin(a)];
 }
 const defaultBeltPoint = () => defaultRingPoint(beltR);
-const defaultKuiperPoint = () => defaultRingPoint(kuiperMid());
+const defaultKuiperPoint = () => defaultRingPoint(kuiperMid(), -TOP + 4);
 
 // the Sun's disc on its own (no halo), blended over what is there: the traveller while the camera pans to the Sun
 function sunDisc(sx, sy, R, alpha) {
-  for (let y = Math.max(0, Math.floor(sy - R)); y <= Math.min(H - 1, Math.ceil(sy + R)); y++) {
+  for (let y = Math.max(-TOP, Math.floor(sy - R)); y <= Math.min(H - 1, Math.ceil(sy + R)); y++) {
     for (let x = Math.max(0, Math.floor(sx - R)); x <= Math.min(W - 1, Math.ceil(sx + R)); x++) {
       const d = Math.hypot(x + 0.5 - sx, y + 0.5 - sy);
       if (d > R) continue;
       const g = (BAYER[((y & 3) << 2) | (x & 3)] + 0.5) / 16 - 0.5, t = d / R + g * 0.16;
-      const c = t < 0.45 ? [255, 246, 150] : t < 0.8 ? [255, 218, 52] : [255, 176, 22], o = buf[y * W + x];
-      buf[y * W + x] = rgb((o & 255) * (1 - alpha) + c[0] * alpha, ((o >> 8) & 255) * (1 - alpha) + c[1] * alpha, ((o >> 16) & 255) * (1 - alpha) + c[2] * alpha);
+      const c = t < 0.45 ? [255, 246, 150] : t < 0.8 ? [255, 218, 52] : [255, 176, 22], o = buf[(y + TOP) * W + x];
+      buf[(y + TOP) * W + x] = rgb((o & 255) * (1 - alpha) + c[0] * alpha, ((o >> 8) & 255) * (1 - alpha) + c[1] * alpha, ((o >> 16) & 255) * (1 - alpha) + c[2] * alpha);
     }
   }
 }
@@ -1378,7 +1620,7 @@ function openView(id, push = true, beltPoint = null) {
   const home = sceneOf(id);                         // a link straight to a body in the other scene: jump there first
   if (home && home !== sceneName()) goScene(home, true);
   clearTimeout(closeTimer); closing = false;
-  hovered = null; page.style.cursor = '';
+  hovered = null; space.style.cursor = '';
   if (!view.id) measureBio();                       // the bio's closed width, before anything moves
   view.id = id; view.dir = 1; view.light = id === SUN_ID ? [0, 0, 1] : null;    // the Sun shines by itself
   view.scene = sceneName();                         // closing returns to the scene the body was opened from
@@ -1446,6 +1688,7 @@ function showCaptions() {
   if (toSun) toSun.hidden = !(still && scene.t >= 1);
 }
 function sceneSettled() {
+  if (reduceMotion) placeStill();
   showCaptions();
   measureText();
   updateButtons();
@@ -1457,18 +1700,11 @@ function sceneSettled() {
 // fly to a scene ('inner' or 'outer'); instant jumps straight there (a link to #outer, or to a body in the other scene)
 function goScene(name, instant = false) {
   const target = name === 'outer' ? 1 : 0;
-  // arriving at the outer position: the outer bodies' clock jumps so all five are in view on arrival, without moving any
-  // that is already on screen (see arrivalJump)
-  if (target && scene.t < 1) {
-    const locked = instant ? [] : placed.filter((p) => isOuter(p.b) && !p.clipped && p.sx > -p.R && p.sy > -p.R && p.sx < W + p.R && p.sy < H + p.R).map((p) => p.b.period);
-    const dj = arrivalJump(clockOut, instant ? 0 : SCENE_MS / 1000, locked);
-    clockOut += dj; jumpOut += dj;
-  }
   if (instant) { scene.t = target; scene.dir = 0; setCam(sceneCam()); sceneSettled(); return; }
   if (scene.t === target && scene.dir === 0) return;
   captionFocus = document.activeElement === toPluto || document.activeElement === toSun;
   scene.dir = target ? 1 : -1;
-  hovered = null; focusedBody = null; page.style.cursor = '';
+  hovered = null; focusedBody = null; space.style.cursor = '';
   showCaptions();
   measureText();
   updateButtons();
@@ -1513,12 +1749,11 @@ window.addEventListener('popstate', () => {
 // what is under the pointer: a planet (a BODIES entry), 'SUN', 'BELT', or null
 function targetAt(ev) {
   if (view.id || sceneMoving()) return null;
-  const r = canvas.getBoundingClientRect();
-  if (!r.width) return null;
-  const x = ((ev.clientX - r.left) / r.width) * W, y = ((ev.clientY - r.top) / r.height) * H;
+  const [x, y] = toArt(ev.clientX, ev.clientY);
+  if (behindWafer(x, y)) return null;                        // the wafer is in front: it covers whatever is behind it
   let best = null, bd = Infinity;
   for (const p of placed) {                                  // planets first: they are the smallest targets
-    if (p.hidden || !p.active || p.clipped) continue;
+    if (p.hidden || !p.active || p.clipped || behindWafer(p.sx, p.sy)) continue;
     const d = Math.hypot(p.sx - x, p.sy - y);
     if (d <= Math.max(p.R + 3, 5) && d < bd) { best = p.b; bd = d; }
   }
@@ -1527,31 +1762,29 @@ function targetAt(ev) {
   // the belt: anywhere in its band on screen (the pointer's position on the orbital plane lies within the band's distance
   // from the sun), except where page text sits on top of it: the text wins
   const xi = Math.floor(x), yi = Math.floor(y);
-  if (xi >= 0 && yi >= 0 && xi < W && yi < H && textMask[yi * W + xi]) return null;
+  if (xi >= 0 && yi >= -TOP && xi < W && yi < H && textMask[(yi + TOP) * W + xi]) return null;
   const rho = radiusThrough(x, y, cam.f);
   if (Math.abs(rho - beltR) <= beltR * (BELT_WIDTH + 0.02)) return 'BELT';
-  if (scene.t >= 1 && rho >= kuiperR[0] * 0.98 && rho <= kuiperR[1] * 1.02) return 'KUIPER';
+  if (rho >= kuiperR[0] && rho <= kuiperR[1]) return 'KUIPER';
   return null;
 }
 // links, buttons and form controls always take the click (and the hover) before anything drawn behind them
 const INTERACTIVE = 'a, button, input, select, textarea, label, [role="button"]';
 
 // read-only hooks for tests and future click features
-canvas.planetPositions = () => placed.map((p) => ({
-  name: p.b.name, x: p.sx * PX, y: p.sy * PX, r: p.R * PX, depth: p.zv, hidden: p.hidden, inView: p.inView,
+canvas.planetPositions = () => placed.map((p, i) => ({
+  name: p.b.name, x: p.sx * PX, y: p.sy * PX, r: p.R * PX, depth: p.zv, hidden: p.hidden, onScreen: p.active && isOnScreen(i),
 }));
-canvas.solarVisible = (i, t, m0) => planetState(i, angleAt(i, t, m0 === undefined ? startRad[i] : m0)).visible;
-canvas.solarVisibleAngle = (i, phi) => planetState(i, phi).visible;
-canvas.solarState = (i, t) => { const p = planetState(i, angleAt(i, t, startRad[i])); return [p.sx, p.sy, p.R, p.hidden ? 1 : 0, p.zv]; };
-canvas.solarRenderAt = (t) => { if (scene.t >= 1) draw(clock, t); else draw(t); };   // (t is the clock of the scene shown)
-// visibility of planet i at time t, seen from its own scene's camera (used by the timeline search)
-canvas.solarSceneVisible = (i, t, m0) => {
-  const keep = cam;
-  setCam(camFor(BODIES[i]));
-  const p = planetState(i, angleAt(i, t, m0 === undefined ? startRad[i] : m0));
-  setCam(keep);
-  return p.visible;
-};
+// every planet's motion state and its isOnScreen box in css viewport px (for tests and the debug overlay)
+canvas.solarBodies = () => BODIES.map((b, i) => {
+  const bx = bodyBox(i), m = motion[i];
+  return { name: b.name, speed: b.speed, state: m.state, waitLeft: m.state === 'waiting' ? m.wait - simT : 0, phi: m.phi, onScreen: isOnScreen(i),
+    box: { left: bx.left, right: bx.right, top: bx.top, bottom: bx.bottom }, x: bx.p.sx * (lay.w / W), y: (bx.p.sy + TOP) * (lay.h / BH) + lay.top - window.scrollY };
+});
+// run the motion rules for dt seconds (in small steps) and draw, without waiting for real time (tests)
+canvas.solarStep = (dt, step = 1 / 60) => { for (let k = 0; k < dt; k += step) stepPlanets(Math.min(step, dt - k)); draw(clock); };
+canvas.solarState = (i) => { const p = planetState(i, motion[i].phi); return [p.sx, p.sy, p.R, p.hidden ? 1 : 0, p.zv]; };
+canvas.solarRenderAt = () => draw(clock);
 canvas.solarScene = () => ({ t: scene.t, dir: scene.dir, name: sceneName(), moving: sceneMoving(), camOut, kuiperR, clockOut,
   sun: { x: sunX * PX, y: sunY * PX, r: sunR * PX } });
 canvas.solarGo = (name, instant) => goScene(name, instant);
@@ -1572,18 +1805,40 @@ canvas.solarSwitchGeometry = (t) => {
     }
     return { name: b.name, pts };
   });
-  const bodies = BODIES.map((b, i) => { const p = planetState(i, angleAt(i, isOuter(b) ? clockOut : clock, startRad[i])); return { name: b.name, x: p.sx * PX, y: p.sy * PX, r: p.R * PX, clipped: p.clipped }; });
+  const bodies = BODIES.map((b, i) => { const p = planetState(i, motion[i].phi); return { name: b.name, x: p.sx * PX, y: p.sy * PX, r: p.R * PX, clipped: p.clipped }; });
   const sunG = { x: sunX * PX, y: sunY * PX, r: sunR * PX, inFront: sunZv > NEAR_CLIP };
   setCam(keep);
   return { orbits, bodies, sun: sunG, W: W * PX, H: H * PX };
 };
-canvas.solarSunSkips = () => sunSkips;       // draw one frame at time t (used with reduced motion, to inspect moments)
+canvas.solarSunSkips = () => sunSkips;
+// how much of each orbit (share of its angles) is drawn in the hackerfab screen (rows above page 4), clear of the wafer, seen
+// from the inner or outer camera position, and the same for the main belt's ring (tests)
+canvas.solarTailPass = (where) => {
+  const keep = cam;
+  setCam(where === 'outer' ? camOut : CAM_IN);
+  const out = {}, n = 3600;
+  BODIES.forEach((b, i) => {
+    let k = 0;
+    for (let d = 0; d < n; d++) { const p = planetState(i, (d / n) * TAU); if (!p.clipped && p.sx >= 0 && p.sx <= W && p.sy >= -TOP && p.sy < 0 && !behindWafer(p.sx, p.sy)) k++; }
+    out[b.name] = +(k / n).toFixed(3);
+  });
+  let belt = 0;
+  for (let d = 0; d < n; d++) {
+    const a = (d / n) * TAU, [sx, sy, zv] = project(beltR * Math.cos(a), 0, -beltR * Math.sin(a));
+    if (zv > NEAR_CLIP && sx >= 0 && sx <= W && sy >= -TOP && sy < 0 && !behindWafer(sx, sy)) belt++;
+  }
+  out['MAIN BELT'] = +(belt / n).toFixed(3);
+  setCam(keep);
+  return out;
+};
+// where the world's page-4 frame starts on the page vs where page 4 actually starts (css px; 0 = perfectly aligned)
+canvas.solarAlignment = () => ({ worldTop: lay.top + TOP * (lay.h / BH), pageTop: lay.page, TOP, BH, H });       // draw one frame at time t (used with reduced motion, to inspect moments)
 // the camera numbers for a viewport of w x h css px, without touching what is drawn (used by the timeline search)
 canvas.solarGeometryFor = (w, h) => {
   const keep = [W, H, D];
   W = Math.ceil(w / (w <= 700 ? 3 : 4)); H = Math.ceil(h / (w <= 700 ? 3 : 4)); D = Math.hypot(W, H);
   layout();
-  const g = { W, H, D, cx, cy, F, orbitR: orbitR.slice(), rSun, r0: BODIES.map(planetR0), dwell: dwell.slice(), incl: BODIES.map((b) => b.incl || 0) };
+  const g = { W, H, D, cx, cy, F, orbitR: orbitR.slice(), rSun, r0: BODIES.map(planetR0), incl: BODIES.map((b) => b.incl || 0) };
   [W, H, D] = keep;
   layout();
   return g;
@@ -1599,12 +1854,16 @@ canvas.solarTargets = () => {
 };
 canvas.solarView = () => ({ id: view.id, t: view.t, dir: view.dir, zoom: easeInOut(view.t), clock, endState: endState(), colRight, cssW, cssH, PX, light: view.light, reduceMotion, mode: viewMode(), closing });
 // the overview's hover labels this frame, in css px (for tests)
+// the Kuiper bodies and the planet discs as drawn last frame, in page-4 art px (rows above page 4 are negative), for tests
+canvas.solarKuiperSeen = () => ({ rocks: lastKuiper.kRocks.map(([sx, sy, s, nr]) => [sx, sy, s.f, nr, radiusThrough(sx, sy, cam.f)]), named: lastKuiper.kNamed.map((k) => [k.m.name, k.sx, k.sy]), kuiperR, plutoR: orbitR[BODIES.findIndex((b) => b.id === 'pluto')], neptuneR: orbitR[BODIES.findIndex((b) => b.id === 'neptune')], TOP, H, W, PX });
+canvas.solarKuiperStats = () => kuiperStats;
+canvas.solarDiscs = () => discs.map((d) => d.slice());
 canvas.solarLabels = () => lastLabels.map(([x, y, w, h, name]) => ({ name, x: (x - 1) * PX, y: (y - 1) * PX, w: (w + 2) * PX, h: (h + 2) * PX }));
 canvas.solarHover = (id) => { hovered = id === SUN_ID ? 'SUN' : id === BELT_ID ? 'BELT' : id === KUIPER_ID ? 'KUIPER' : BODIES.find((b) => b.id === id) || null; redraw(); };
 // what a click at this point would hit, ignoring the page's own elements (for tests): a planet id, 'sun', 'asteroid-belt' or null
 canvas.solarHitAt = (clientX, clientY) => { const h = targetAt({ clientX, clientY }); return h === 'SUN' ? SUN_ID : h === 'BELT' ? BELT_ID : h === 'KUIPER' ? KUIPER_ID : h ? h.id : null; };
 canvas.solarBandAt = (clientX, clientY) => {        // is this point inside the belt's band at all (text or not)? (for tests)
-  const r = canvas.getBoundingClientRect(), x = ((clientX - r.left) / r.width) * W, y = ((clientY - r.top) / r.height) * H;
+  const [x, y] = toArt(clientX, clientY);
   return Math.abs(radiusThrough(x, y, cam.f) - beltR) <= beltR * (BELT_WIDTH + 0.02);
 };
 canvas.solarBeltPoint = () => { const [x, h, z] = view.beltPoint || defaultBeltPoint(), [sx, sy] = project(x, h, z); return { x: sx * PX, y: sy * PX }; };
@@ -1615,47 +1874,69 @@ canvas.planetButtons = () => buttons.map((el, i) => ({ id: BODIES[i].id, hidden:
 canvas.planetData = (id) => PLANET_DATA[id] || null;      // read-only access to the planet table (used by the detail view)
 canvas.solarSizes = () => sizeReport;
 canvas.solarSunSeen = () => (sunSeen ? { x: sunSeen.x * PX, y: sunSeen.y * PX, r: sunSeen.r * PX } : null);   // the sun as drawn last frame (css px)
-canvas.solarArrivals = () => arrivals.slice();
-canvas.solarInfo = () => ({ W, H, D, F, cx, cy, orbitR, beltR, rSun, kuiperR, kuiperSpan, camOut, dwell, mercuryLowest: mercuryLowest(), ids: BODIES.map((b) => b.id),
-  periods: BODIES.map((b) => b.period), start: BODIES.map((b) => b.start), lull: BODIES.map((b) => b.lull), r0: BODIES.map(planetR0) });
+canvas.solarInfo = () => ({ W, H, D, F, cx, cy, orbitR, beltR, rSun, kuiperR, kuiperZv, camOut, mercuryLowest: mercuryLowest(), ids: BODIES.map((b) => b.id),
+  speeds: BODIES.map((b) => b.speed), start: BODIES.map((b) => b.start), r0: BODIES.map(planetR0) });
 
-page.addEventListener('pointermove', (ev) => {
+space.addEventListener('pointermove', (ev) => {
   if (ev.pointerType === 'touch') return;
   const hit = ev.target.closest(INTERACTIVE) ? null : targetAt(ev);
   if (hit !== hovered) {
     hovered = hit;
-    page.style.cursor = hit ? 'pointer' : '';
+    space.style.cursor = hit ? 'pointer' : '';
     redraw();
   }
-});
-page.addEventListener('pointerleave', () => { if (hovered) { hovered = null; page.style.cursor = ''; redraw(); } });
-page.addEventListener('click', (ev) => {
-  if (view.id) {                                       // empty space closes; the text, the back link and the body itself do not
-    const e = endState(), box = canvas.getBoundingClientRect();
-    const onPlanet = Math.hypot(ev.clientX - box.left - e.x * PX, ev.clientY - box.top - e.y * PX) <= e.R * PX;
+}, { passive: true });
+space.addEventListener('pointerleave', () => { if (hovered) { hovered = null; space.style.cursor = ''; redraw(); } }, { passive: true });
+
+// open a body from the overview. If page 4 is not where the close-up needs it (say the planet was clicked up in the
+// hackerfab screen), scroll it into place first, smoothly (instantly with reduced motion), then open as usual
+let pendingOpen = null;
+function openFromOverview(id, beltPoint = null) {
+  if (Math.abs(window.scrollY - lay.page) < 2) { openView(id, true, beltPoint); return; }
+  clearTimeout(pendingOpen);
+  const go = () => { clearTimeout(pendingOpen); pendingOpen = null; window.removeEventListener('scrollend', go); openView(id, true, beltPoint); };
+  window.addEventListener('scrollend', go, { once: true });
+  pendingOpen = setTimeout(go, reduceMotion ? 50 : 1200);   // fallback where scrollend is not supported
+  page.scrollIntoView({ behavior: reduceMotion ? 'instant' : 'smooth' });
+}
+
+space.addEventListener('click', (ev) => {
+  if (view.id) {                                       // empty space on page 4 closes; the text, the back link and the body do not
+    if (!ev.target.closest('.page4')) return;
+    const e = endState(), [ax, ay] = toArt(ev.clientX, ev.clientY);
+    const onPlanet = Math.hypot(ax - e.x, ay - e.y) <= e.R;
     if (!onPlanet && !ev.target.closest('.page4-text, .planet-info')) requestClose();
     return;
   }
   if (ev.target.closest(INTERACTIVE)) return;          // a link (or any control) over the canvas keeps its click
   const hit = targetAt(ev);
   canvas.dispatchEvent(new CustomEvent('solar-click', { detail: { name: nameOf(hit) } }));   // hook for what comes next
-  if (hit && hit.id) openView(hit.id);                 // a planet, the Sun or the belt opens its view
-  else if (hit === 'SUN') openView(SUN_ID);
+  if (hit && hit.id) openFromOverview(hit.id);         // a planet, the Sun or a belt opens its view
+  else if (hit === 'SUN') openFromOverview(SUN_ID);
   else if (hit === 'BELT' || hit === 'KUIPER') {
-    const r = canvas.getBoundingClientRect(), sx = ((ev.clientX - r.left) / r.width) * W, sy = ((ev.clientY - r.top) / r.height) * H;
-    if (hit === 'BELT') openView(BELT_ID, true, beltPointUnder(sx, sy));
-    else openView(KUIPER_ID, true, ringPointUnder(sx, sy, kuiperMid()));
+    const [sx, sy] = toArt(ev.clientX, ev.clientY);
+    if (hit === 'BELT') openFromOverview(BELT_ID, beltPointUnder(sx, sy));
+    else openFromOverview(KUIPER_ID, ringPointUnder(sx, sy, kuiperMid()));
   }
 });
 
 resize();
+if (reduceMotion) { placeStill(); redraw(); }
 if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
 else window.addEventListener('resize', resize);
 // the hover labels must stay off the text, so the text mask is re-measured whenever the text can move: web fonts arriving
 // (they change line widths), the page finishing loading, and the bio changing size outside the planet view
 const remeasure = () => { if (!view.id) { measureText(); redraw(); } };
+// the wafer's outline (and the hackerfab text around it) settles when the wafer fits itself to the page; anything above can
+// also move the canvas down the document (the hero's height on phones): re-cache positions then, never while scrolling
+const reposition = () => { cacheOffsets(); buildWaferMask(); remeasure(); };
+const waferCanvas = document.querySelector('.wafer-canvas');
+if (waferCanvas) waferCanvas.addEventListener('wafer-fit', reposition);
+if (window.ResizeObserver) new ResizeObserver(reposition).observe(document.body);
 if (document.fonts) {
-  if (document.fonts.ready) document.fonts.ready.then(remeasure);
+  // once the web fonts are in, the text boxes have their final size: lay out again (on phones the outer orbits keep under
+  // the bio, and the Kuiper belt's named bodies keep clear of the text)
+  if (document.fonts.ready) document.fonts.ready.then(() => { if (view.id) remeasure(); else resize(); });
   document.fonts.addEventListener && document.fonts.addEventListener('loadingdone', remeasure);
 }
 window.addEventListener('load', remeasure);
@@ -1677,6 +1958,7 @@ function openFromHash() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', openFromHash, { once: true });
 else setTimeout(openFromHash, 0);
 
+if (reduceMotion) window.addEventListener('scrollend', () => { placeStill(); redraw(); }, { passive: true });
 if (!reduceMotion) {
   new IntersectionObserver((entries) => {
     visible = entries[0].isIntersecting;

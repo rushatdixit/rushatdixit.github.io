@@ -10,18 +10,18 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/gochi-hand/400.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/press-start-2p/400.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-  <link rel="stylesheet" href="css/style.css?v=78">
-  <script src="js/wafer.js?v=78" defer></script>
-  <script src="js/note.js?v=78" defer></script>
-  <script src="js/brand.js?v=78" defer></script>
-  <script src="js/scroll.js?v=78" defer></script>
-  <script src="js/callout.js?v=78" defer></script>
-  <script src="js/gravity.js?v=78" defer></script>
-  <script src="js/backgrounds.js?v=78" defer></script>
-  <script src="js/bodies.js?v=78" defer></script>
-  <script src="js/solar.js?v=78" defer></script>
-  <script src="js/planet-view.js?v=78" defer></script>
-  <script src="js/planet-callouts.js?v=78" defer></script>
+  <link rel="stylesheet" href="css/style.css?v=84">
+  <script src="js/wafer.js?v=84" defer></script>
+  <script src="js/note.js?v=84" defer></script>
+  <script src="js/brand.js?v=84" defer></script>
+  <script src="js/scroll.js?v=84" defer></script>
+  <script src="js/callout.js?v=84" defer></script>
+  <script src="js/gravity.js?v=84" defer></script>
+  <script src="js/backgrounds.js?v=84" defer></script>
+  <script src="js/bodies.js?v=84" defer></script>
+  <script src="js/solar.js?v=84" defer></script>
+  <script src="js/planet-view.js?v=84" defer></script>
+  <script src="js/planet-callouts.js?v=84" defer></script>
   <!-- KaTeX comes from a CDN, so it goes last: a slow CDN must not hold up anything above (gravity.js typesets once the page has loaded) -->
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
 </head>
@@ -35,7 +35,7 @@
           <div id="gravity-equation"></div>
         </section>
       </div>
-      <img class="portrait" src="images/me.jpg" alt="Portrait of me">
+      <img class="portrait" src="images/me.jpg" alt="Portrait of me" width="440" height="666">
       <svg class="callout" aria-hidden="true">
         <path class="callout-line"/>
         <path class="callout-head"/>
@@ -50,6 +50,9 @@
         </svg>
       </a>
     </section>
+    <!-- one background for the hackerfab screen and page 4: the solar system canvas sits behind both and scrolls with them -->
+    <div class="space">
+    <canvas class="solar-canvas" role="img" aria-label="Pixel-art model of the solar system"></canvas>
     <section class="hobbies" id="hobbies">
       <canvas class="wafer-canvas" aria-hidden="true"></canvas>
       <div class="hobbies-slide">
@@ -69,7 +72,7 @@
       </div>
       <div class="hobbies-tail">
         <div class="hobbies-brand">
-          <img src="images/hackerfab-iitb-logo.png" alt="HackerFab IITB logo">
+          <img src="images/hackerfab-iitb-logo.png" alt="HackerFab IITB logo" width="590" height="590">
           <a href="https://hackerfabiitb.org" target="_blank" rel="noopener noreferrer">our website</a>
         </div>
         <!-- saved earlier version: I’m building <span class="orange">hackerfab india</span> - we’re making semiconductor fabrication open-source and accessible to indian students -->
@@ -82,7 +85,6 @@
       </div>
     </section>
     <section class="page4" id="page4">
-      <canvas class="solar-canvas" role="img" aria-label="Pixel-art model of the solar system"></canvas>
       <!-- on phones, while a planet is open, this becomes one scrolling column: the planet facts, then the bio -->
       <div class="page4-scroll">
         <div class="page4-text">
@@ -98,6 +100,7 @@
       <a class="page4-pluto" href="#outer">&lt;- towards pluto</a>
       <a class="page4-sun" href="#" hidden>towards the sun -&gt;</a>
     </section>
+    </div>
   </main>
 </body>
 </html>

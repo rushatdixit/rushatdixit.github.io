@@ -28,7 +28,6 @@ const COLOR_HALO    = '#f19bd8'; // wide magenta / pink halo (the dominant hue)
 const COLOR_FRINGE  = '#dcec9e'; // faint yellow-green fringe
 const COLOR_FRINGE2 = '#ffd9bd'; // pale peach, the last fringe before the resting pearl
 
-const COLOR_BG      = '#000000'; // page (was #F1EEE7 on the light version)
 const COLOR_DIE     = '#d2e0f5'; // resting die: pale blue
 const COLOR_SCRIBE  = '#e4eefa'; // resting scribe lines: near-white blue-grey
 
@@ -56,7 +55,7 @@ uniform float uEnergy;             // 0..1 glow strength
 uniform float uGlowR;
 uniform vec2  uDie;
 uniform vec3  uCore, uRing, uHalo, uFringe, uFringe2;
-uniform vec3  uBg, uDieCol, uScribeCol;
+uniform vec3  uDieCol, uScribeCol;
 uniform float uGrid;               // lattice rotation, radians
 
 float hash12(vec2 p) {
@@ -155,17 +154,10 @@ void main() {
   rim = mix(rim, iri(xg) * 0.95, weight(xg) * uEnergy * 0.22);
   col = mix(col, rim, smoothstep(0.989, 0.992, len));            // thin edge, like a real wafer
 
-  // ---- page + soft drop shadow on the left ---------------------------------
-  float sd = length(uv - vec2(-0.05, -0.022)) - 1.0;
-  float shadow = (1.0 - smoothstep(-0.02, 0.22, sd)) * 0.085;
-  vec3 page = uBg * (1.0 - shadow * vec3(0.95, 0.95, 0.80));
-
-  float inside = cover(len - 1.0, fw * 1.2);
-  vec3 outc = mix(page, col, inside);
-  outc = valid ? outc : uBg;
-
-  outc += (hash12(gl_FragCoord.xy) - 0.5) / 255.0;      // dither against banding
-  outColor = vec4(outc, 1.0);
+  // ---- cut out: the wafer only, transparent outside its edge (the solar system behind shows up to the rim) ----
+  float inside = valid ? cover(len - 1.0, fw * 1.2) : 0.0;
+  vec3 outc = col + (hash12(gl_FragCoord.xy) - 0.5) / 255.0;   // dither against banding
+  outColor = vec4(outc * inside, inside);                       // premultiplied alpha
 }`;
 
 /* ------------------------------------------------------------------ *
@@ -173,7 +165,7 @@ void main() {
  * ------------------------------------------------------------------ */
 const canvas = document.querySelector('.wafer-canvas');
 if (!canvas) return;
-const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+const gl = canvas.getContext('webgl2', { antialias: false, alpha: true, premultipliedAlpha: true, powerPreference: 'high-performance' });
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const hex = (s) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16) / 255);
@@ -181,6 +173,7 @@ const rad = (d) => (d * Math.PI) / 180;
 const TAN = Math.tan(rad(FOV) / 2);
 
 let W = 1, H = 1, aspect = 1;
+const pos = { left: 0, top: 0, width: 1, height: 1 };   // the canvas in document px (set on resize)
 const att = { x: 0, y: 0 };            // eased lean of the wafer toward the cursor
 let edgePts = [];                      // resting outline in canvas px, for things that point at the wafer
 let dropY = 0, dropX = 0;              // how far the wafer is lowered / pushed right so it never runs into the text
@@ -230,7 +223,7 @@ if (gl) {
   gl.useProgram(prog);
   gl.bindVertexArray(gl.createVertexArray());
   for (const n of ['uRes', 'uSpan', 'uAspect', 'uTan', 'uC', 'uU', 'uV', 'uN', 'uR', 'uLight', 'uEnergy', 'uGlowR', 'uDie',
-    'uCore', 'uRing', 'uHalo', 'uFringe', 'uFringe2', 'uBg', 'uDieCol', 'uScribeCol', 'uGrid']) {
+    'uCore', 'uRing', 'uHalo', 'uFringe', 'uFringe2', 'uDieCol', 'uScribeCol', 'uGrid']) {
     loc[n] = gl.getUniformLocation(prog, n);
   }
   gl.uniform1f(loc.uTan, TAN);
@@ -241,7 +234,6 @@ if (gl) {
   gl.uniform3fv(loc.uHalo, hex(COLOR_HALO));
   gl.uniform3fv(loc.uFringe, hex(COLOR_FRINGE));
   gl.uniform3fv(loc.uFringe2, hex(COLOR_FRINGE2));
-  gl.uniform3fv(loc.uBg, hex(COLOR_BG));
   gl.uniform3fv(loc.uDieCol, hex(COLOR_DIE));
   gl.uniform1f(loc.uGrid, rad(GRID_ROTATION));
   gl.uniform3fv(loc.uScribeCol, hex(COLOR_SCRIBE));
@@ -259,7 +251,12 @@ function resize() {
   buildPlane(0, 0);
   edgePts = outlinePx();
   buildPlane(att.x, att.y);
+  // where the canvas sits in the document, for mapping the cursor every frame without reading layout
+  pos.left = 0; pos.top = 0;
+  for (let e = canvas; e; e = e.offsetParent) { pos.left += e.offsetLeft; pos.top += e.offsetTop; }
+  pos.width = canvas.clientWidth; pos.height = canvas.clientHeight;
   if (gl) {
+    gl.clearColor(0, 0, 0, 0);
     gl.viewport(0, 0, W, H);
     gl.uniform2f(loc.uRes, W, H);
     gl.uniform1f(loc.uSpan, SPAN);
@@ -290,6 +287,8 @@ canvas.waferEdgeAt = (yPx) => {
   for (const p of edgePts) if (!best || Math.abs(p.y - yPx) < Math.abs(best.y - yPx)) best = p;
   return best;
 };
+// the resting outline in canvas px (the solar system behind uses it: planets behind the disc are hidden, not clickable)
+canvas.waferOutline = () => edgePts.map((p) => ({ x: p.x, y: p.y }));
 // x (canvas px) of the wafer's left end: the leftmost point of the resting outline
 canvas.waferLeft = () => (edgePts.length ? Math.min(...edgePts.map((p) => p.x)) : null);
 
@@ -414,9 +413,9 @@ function frame(now) {
   // map the cursor into the canvas; outside it (e.g. over the hero) counts as "left"
   let live = pointerSeen && pointerInside;
   if (live) {
-    const rect = canvas.getBoundingClientRect();
-    ptr.ax = (ptr.cx - rect.left) / rect.width * 2 - 1;
-    const cay = -((ptr.cy - rect.top) / rect.height * 2 - 1);      // -1..1 over the whole tall canvas
+    const left = pos.left - window.scrollX, top = pos.top - window.scrollY;   // cached on resize: no layout read per frame
+    ptr.ax = (ptr.cx - left) / pos.width * 2 - 1;
+    const cay = -((ptr.cy - top) / pos.height * 2 - 1);            // -1..1 over the whole tall canvas
     ptr.nx = ptr.ax * aspect;
     ptr.ny = SPAN * (cay - 1) + 1;                                  // same mapping the shader uses
     ptr.ay = Math.max(-1, Math.min(1, ptr.ny));                     // for the wafer's lean
@@ -472,6 +471,7 @@ function frame(now) {
 
   if (gl) {
     uploadPlane();
+    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform2f(loc.uLight, light.x, light.y);
     gl.uniform1f(loc.uEnergy, energy);
     gl.drawArrays(gl.TRIANGLES, 0, 3);

@@ -31,15 +31,30 @@ body {
 html {
   background: var(--bg);        /* the root itself is black, so no white can show at a rounding gap or when overscrolling */
   color-scheme: dark;
-  /* the browser's own snapping, as in the first version: every screen is a stop and the page never rests part-way.
-     The Hobbies screens sit in an overflow:clip box (not a scroll container), so they count as page-level stops. */
+  /* the browser's own snapping: every screen is a stop and the page never rests part-way. The Hobbies screens sit in an
+     overflow:clip box (not a scroll container), so they count as page-level stops. Smooth scrolling just for the site's
+     own in-page jumps, and not with reduced motion */
   scroll-snap-type: y mandatory;
 }
+/* a screen whose content is taller than the window (set by js/scroll.js): snap only when close, so nothing is unreachable */
+html.snap-loose { scroll-snap-type: y proximity; }
 
 .hero,
 .hobbies-slide,
-.hobbies-tail {
+.hobbies-tail,
+.page4 {
   scroll-snap-align: start;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* the hackerfab screen and page 4 share one background: the solar system canvas (js/solar.js) sits behind both and
+   scrolls with them natively, from the top of the hackerfab screen to the bottom of page 4 */
+.space {
+  position: relative;
+  overflow-x: clip;             /* a planet button near the right edge must never widen the page */
 }
 
 .content {
@@ -83,6 +98,7 @@ html {
 
 #gravity-equation {
   margin-top: 0.5rem;
+  min-height: 2.48em;          /* the typeset equation's height, reserved so nothing shifts when KaTeX arrives */
   font-size: clamp(1.1rem, 2vw, 1.75rem);
   text-align: center;
 }
@@ -216,21 +232,25 @@ html {
 /* ---- page 4: a blank canvas, one screen tall, black like the rest ---- */
 .page4 {
   position: relative;
-  height: 100vh;
-  background: var(--bg);
-  scroll-snap-align: start;
+  z-index: 1;                  /* above the shared solar system canvas; no background of its own */
+  height: 100svh;
+  min-height: 100svh;
   overflow: clip;
 }
 
-/* the solar system sits behind everything else on page 4 */
+/* the solar system: behind both sections (stars, then orbits and planets; the wafer, logo and text are all in front).
+   It fades in over the top of the hackerfab screen, where the screen above begins */
 .solar-canvas {
   position: absolute;
-  inset: 0;
-  z-index: 0;
+  top: 100svh;
+  left: 0;
   width: 100%;
-  height: 100%;
+  height: 200svh;
+  z-index: 0;
   display: block;
   image-rendering: pixelated;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 25svh);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 25svh);
 }
 
 .page4-hint,
@@ -326,7 +346,8 @@ html {
   --ink: #f3f1ec;      /* text on the black Hobbies page */
   --navy: #8fa3ff;     /* the "navy" accent, lightened so it reads on black */
   position: relative;
-  height: 200vh;               /* two screens: the wafer runs on from the first into the second */
+  z-index: 1;                  /* above the shared solar system canvas: the wafer, the logo and the text */
+  height: 200svh;              /* two screens: the wafer runs on from the first into the second */
   overflow: clip;              /* clips the canvas to the section without making it a scroll container */
   color: var(--ink);
 }
@@ -337,16 +358,18 @@ html {
   top: 0;
   left: 0;
   right: 0;
-  height: 100vh;
+  height: 100svh;
+  min-height: 100svh;
 }
 
 /* screen 2: nothing but black and the lower part of the wafer (this block only reserves the height) */
 .hobbies-tail {
   position: absolute;
-  top: 100vh;
+  top: 100svh;
   left: 0;
   right: 0;
-  height: 100vh;
+  height: 100svh;
+  min-height: 100svh;
 }
 
 /* the HackerFab IITB logo, top-left of the last screen, with its link centred underneath */
@@ -367,6 +390,7 @@ html {
 .hobbies-brand img {
   display: block;
   width: 100%;
+  height: auto;                /* the width/height attributes only reserve the space (no layout shift); CSS sets the size */
   aspect-ratio: 1;
   border-radius: 50%;
   object-fit: cover;
@@ -561,7 +585,7 @@ html {
 .planet-buttons {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 0;                  /* with the canvas, under both sections: for the keyboard (the mouse uses the canvas hit test) */
   pointer-events: none;
 }
 
@@ -575,10 +599,8 @@ html {
   background: transparent;
   color: inherit;
   cursor: pointer;
-  pointer-events: auto;
+  pointer-events: none;        /* the mouse and touch go through the canvas hit test, so links in front always win */
 }
-
-.planet-btn.is-keyboard { pointer-events: none; }   /* the Sun's and the belt's: for the keyboard; the mouse uses the canvas hit test */
 
 .planet-btn:focus-visible {
   outline: 2px dashed #fff;
