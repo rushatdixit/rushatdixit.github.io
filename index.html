@@ -11,32 +11,20 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/open-sauce-sans/700.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/gochi-hand/400.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/press-start-2p/400.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-  <link rel="stylesheet" href="css/style.css?v=87">
-  <script src="js/wafer.js?v=87" defer></script>
-  <script src="js/note.js?v=87" defer></script>
-  <script src="js/brand.js?v=87" defer></script>
-  <script src="js/scroll.js?v=87" defer></script>
-  <script src="js/callout.js?v=87" defer></script>
-  <script src="js/gravity.js?v=87" defer></script>
-  <script src="js/backgrounds.js?v=87" defer></script>
-  <script src="js/bodies.js?v=87" defer></script>
-  <script src="js/solar.js?v=87" defer></script>
-  <script src="js/planet-view.js?v=87" defer></script>
-  <script src="js/planet-callouts.js?v=87" defer></script>
-  <!-- KaTeX comes from a CDN, so it goes last: a slow CDN must not hold up anything above (gravity.js typesets once the page has loaded) -->
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+  <link rel="stylesheet" href="css/style.css?v=91">
+  <script src="js/brand.js?v=91" defer></script>
+  <script src="js/scroll.js?v=91" defer></script>
+  <script src="js/callout.js?v=91" defer></script>
+  <script src="js/backgrounds.js?v=91" defer></script>
+  <script src="js/bodies.js?v=91" defer></script>
+  <script src="js/solar.js?v=91" defer></script>
+  <script src="js/planet-view.js?v=91" defer></script>
+  <script src="js/planet-callouts.js?v=91" defer></script>
 </head>
 <body>
   <main id="top">
     <section class="hero">
       <h1 class="name">Rushat Dixit</h1>
-      <div class="content">
-        <section class="gravity">
-          <canvas id="gravity-canvas" width="160" height="90" role="img" aria-label="Pixelated animation of the moon orbiting the earth, with gravitational force vectors"></canvas>
-          <div id="gravity-equation"></div>
-        </section>
-      </div>
       <img class="portrait" src="images/me.jpg" alt="Portrait of me" width="440" height="666">
       <svg class="callout" aria-hidden="true">
         <path class="callout-line"/>
@@ -65,12 +53,6 @@
     <div class="space">
     <canvas class="solar-canvas" role="img" aria-label="Pixel-art model of the solar system"></canvas>
     <section class="hackerfab" id="hackerfab">
-      <canvas class="wafer-canvas" aria-hidden="true"></canvas>
-      <svg class="hobbies-note-arrow" aria-hidden="true">
-        <path class="note-line"/>
-        <path class="note-head"/>
-      </svg>
-      <p class="hobbies-note">the dazzling rainbowy colors of the silicon wafer are caused by a thin film of SiO<sub>2</sub> which is grown on it using a tube furnace!</p>
       <div class="hf-inner">
         <div class="hf-brand">
           <img src="images/hackerfab-iitb-logo.png" alt="HackerFab IITB logo" width="590" height="590">

@@ -55,20 +55,6 @@ html {
   overflow-x: clip;             /* a planet button near the right edge must never widen the page */
 }
 
-.content {
-  position: absolute;
-  top: var(--edge-gap);
-  bottom: var(--edge-gap);
-  left: var(--edge-gap);
-  right: calc(var(--edge-gap) + var(--photo-w) + var(--content-gap));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: safe center;
-  overflow: visible;           /* never an inner scroll area: it would swallow wheel events meant for the page */
-  text-align: center;
-}
-
 .name {
   position: absolute;
   top: var(--edge-gap);
@@ -78,31 +64,6 @@ html {
   font-size: clamp(1.33rem, 4vw, 3.56rem);
   line-height: 0.95;
   text-transform: lowercase;
-}
-
-.gravity {
-  width: 100%;
-  margin-top: clamp(1.5rem, 4vh, 3rem);
-}
-
-#gravity-canvas {
-  display: block;
-  width: 100%;
-  max-width: max(160px, min(640px, 100%, calc((100vh - 14rem) * 16 / 9)));   /* shrinks on short windows so the column fits */
-  margin: 0 auto;
-  aspect-ratio: 160 / 90;
-  image-rendering: pixelated;
-}
-
-#gravity-equation {
-  margin-top: 0.5rem;
-  min-height: 2.48em;          /* the typeset equation's height, reserved so nothing shifts when KaTeX arrives */
-  font-size: clamp(1.1rem, 2vw, 1.75rem);
-  text-align: center;
-}
-
-#gravity-equation .katex-display {
-  margin: 0.4em 0;
 }
 
 .callout {
@@ -235,7 +196,7 @@ html {
   padding: 3vw var(--page-x) max(9vw, calc(var(--edge-gap) + 4.5rem));
 }
 
-/* the solar system: behind hackerfab, about and projects (stars, then orbits and planets; the wafer, logo and text are
+/* the solar system: behind hackerfab, about and projects (stars, then orbits and planets; the logo and text are
    all in front), as tall as the three sections are. It fades in over the top of hackerfab, under the header, and out to
    black over its last 15%, before the footer */
 .solar-canvas {
@@ -325,21 +286,11 @@ html {
 }
 .about-body a:hover { text-decoration-color: currentColor; }
 
-/* ---- hackerfab: the WebGL silicon wafer top-right, the logo block top-left, then the headline and a sentence ---- */
+/* ---- hackerfab: the logo block top-left, then the headline and a sentence ---- */
 .hackerfab {
   position: relative;
-  z-index: 1;                  /* above the shared solar system canvas: the wafer, the logo and the text */
-  min-height: 52.78vw;
-  overflow: clip;              /* clips the wafer to the section without making it a scroll container */
+  z-index: 1;                  /* above the shared solar system canvas: the logo and the text */
   color: var(--ink);
-}
-
-.wafer-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
 }
 
 .hf-inner {
@@ -464,40 +415,6 @@ html {
 
 .purple {
   color: #b57bff;
-}
-
-/* the handwritten SiO2 note, by the wafer's lower-left edge, with an arrow to it (js/note.js places both) */
-.hobbies-note {
-  position: absolute;
-  z-index: 2;
-  left: 0;
-  top: 0;
-  width: clamp(150px, 19vw, 300px);
-  margin: 0;
-  font-family: var(--hand);
-  font-size: clamp(14px, 1.55vw, 24px);
-  line-height: 1.2;
-  color: var(--navy);
-  rotate: -3deg;
-  transform-origin: right top;
-}
-
-.hobbies-note-arrow {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.hobbies-note-arrow path {
-  fill: none;
-  stroke: var(--navy);
-  stroke-width: clamp(2px, 0.2vw, 3px);
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 /* ---- header: after the first screen, static ---- */
@@ -911,7 +828,6 @@ html.planet-locked { overflow: hidden; }
     padding: var(--edge-gap);
   }
 
-  .content,
   .portrait,
   .name,
   .hero-tagline {
@@ -924,10 +840,6 @@ html.planet-locked { overflow: hidden; }
     width: fit-content;          /* so the squiggle is as wide as the words */
     margin-top: var(--edge-gap);
     text-align: left;
-  }
-
-  .content {
-    overflow: visible;
   }
 
   .callout,

@@ -1,18 +1,13 @@
-// The hackerfab section's text around the wafer:
-//  - the blue hand-drawn arrow from "check it out!" up to the "our website" link beside the logo;
-//  - the headline kept clear of the wafer (and of the SiO2 note) at every width: its top margin grows (--hf-clear)
-//    until no line of it reaches up into the wafer's outline, measured on the wafer's resting pose.
+// The hackerfab section's logo block: the blue hand-drawn arrow from "check it out!" up to the "our website" link beside
+// the logo, redrawn whenever the text can move.
 (() => {
-  const canvas = document.querySelector('.wafer-canvas');
   const section = document.querySelector('.hackerfab');
   const inner = document.querySelector('.hf-inner');
   const link = document.querySelector('.hf-brand-text a');
   const note = document.querySelector('.brand-note');
   const line = document.querySelector('.brand-line');
   const head = document.querySelector('.brand-head');
-  const headline = document.querySelector('.hf-headline');
-  const sio2 = document.querySelector('.hobbies-note');
-  if (!canvas || !section || !inner || !link || !note || !line || !head || !headline) return;
+  if (!section || !inner || !link || !note || !line || !head) return;
 
   function drawArrow() {
     const t = inner.getBoundingClientRect(), l = link.getBoundingClientRect(), n = note.getBoundingClientRect();
@@ -30,38 +25,7 @@
     head.setAttribute('d', barb(len, 0.5) + ' ' + barb(len * 0.82, -0.55));
   }
 
-  // move the headline down until it clears the wafer and the note (never up past its own 24vw margin: see the CSS)
-  function clearHeadline() {
-    const pts = canvas.waferOutline ? canvas.waferOutline() : [];
-    const s = section.getBoundingClientRect();
-    const gap = Math.max(16, 0.02 * section.clientWidth);
-    let need = -Infinity;
-    const range = document.createRange();
-    range.selectNodeContents(headline);
-    for (const r of range.getClientRects()) {
-      const top = r.top - s.top, x0 = r.left - s.left - gap, x1 = r.right - s.left + gap;
-      let low = -Infinity;                                               // the wafer's lowest point over this line
-      for (const p of pts) if (p.x >= x0 && p.x <= x1) low = Math.max(low, p.y);
-      if (low > -Infinity) need = Math.max(need, low + gap - top);
-      if (sio2 && sio2.offsetParent !== null) {
-        const q = sio2.getBoundingClientRect();
-        if (q.right > r.left - gap && q.left < r.right + gap) need = Math.max(need, q.bottom + gap - r.top);
-      }
-    }
-    if (need === -Infinity) return;
-    const margin = parseFloat(getComputedStyle(headline).marginTop) || 0;
-    const want = Math.max(0, Math.round(margin + need));
-    if (Math.abs(want - (parseFloat(headline.style.getPropertyValue('--hf-clear')) || 0)) >= 1) headline.style.setProperty('--hf-clear', want + 'px');
-  }
-
-  function layout() {
-    clearHeadline();
-    drawArrow();
-  }
-
-  layout();
-  canvas.addEventListener('wafer-fit', layout);
-  canvas.addEventListener('note-placed', layout);
-  window.addEventListener('resize', layout);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+  drawArrow();
+  window.addEventListener('resize', drawArrow);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawArrow);
 })();

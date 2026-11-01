@@ -2,7 +2,7 @@
 // The orbits lie in a flat plane with the sun at its centre; the camera looks down at it from about 27 degrees
 // above that plane with mild perspective, so the circular orbits become flattened ellipses. Everything is drawn
 // with plain 2D-canvas maths into a small buffer that CSS scales up with `image-rendering: pixelated` (the same
-// technique as the earth-moon animation on page 1, js/gravity.js). Tweak the constants and BODIES to change it.
+// technique as the earth-moon animation that was on page 1, now removed: a local copy is in archive/, which git ignores). Tweak the constants and BODIES to change it.
 (() => {
 const canvas = document.querySelector('.solar-canvas');
 if (!canvas) return;
@@ -1190,7 +1190,7 @@ function measureText() {
       if (n.parentElement.closest('[hidden]') || getComputedStyle(n.parentElement).visibility === 'hidden') continue;
       const range = document.createRange();
       range.selectNodeContents(n);
-      const blk = perBlock && (n.parentElement.closest('.hf-headline, .hf-brand-text a, .brand-note, .hf-body p, .hobbies-note') || n.parentElement);
+      const blk = perBlock && (n.parentElement.closest('.hf-headline, .hf-brand-text a, .brand-note, .hf-body p') || n.parentElement);
       for (const r of range.getClientRects()) {
         rects.push(r);
         if (blk) { if (!blocks.has(blk)) blocks.set(blk, []); blocks.get(blk).push(r); continue; }
@@ -1201,11 +1201,11 @@ function measureText() {
   walk(page);
   walk(space.querySelector('.projects'));          // the project rows: dark boxes behind their lines, like the bio
   // the hackerfab section's text sits over this canvas too: the headline, the sentence under it, "our website", "check it
-  // out!" and the SiO2 note each get one soft scrim (below), so planets passing behind dim gently instead of being cut off
+  // out!" each get one soft scrim (below), so planets passing behind dim gently instead of being cut off
   // by boxes; the logo and the hand-drawn arrows only keep the planet names off them
   const tail = space.querySelector('.hackerfab');
   walk(tail, true);
-  if (tail) for (const el of tail.querySelectorAll('img, .brand-arrow path, .hobbies-note-arrow path')) { const r = el.getBoundingClientRect(); if (r.width || r.height) solid.push(r); }
+  if (tail) for (const el of tail.querySelectorAll('img, .brand-arrow path')) { const r = el.getBoundingClientRect(); if (r.width || r.height) solid.push(r); }
   const box = (r, m) => [Math.max(0, Math.floor((r.left - cr.left) / qx) - m), Math.min(W - 1, Math.ceil((r.right - cr.left) / qx) + m),
     Math.max(0, Math.floor((r.top - cr.top) / qy) - m), Math.min(BH - 1, Math.ceil((r.bottom - cr.top) / qy) + m)];
   const apply = (r, m, f) => {
@@ -1270,8 +1270,10 @@ function cacheOffsets() {
 // a client point to page-4 art coordinates (y < 0 is up in the hackerfab screen)
 const toArt = (clientX, clientY) => [((clientX - (lay.left - window.scrollX)) / lay.w) * W, ((clientY - (lay.top - window.scrollY)) / lay.h) * BH - TOP];
 
-// the silicon wafer (in the screen above) covers part of this canvas: its outline, filled into a mask in buffer rows.
-// A planet behind it is not named, not hoverable and not clickable (it is still drawn: the wafer simply covers it)
+// the silicon wafer (in the screen above), when the page has one, covers part of this canvas: its outline, filled into a
+// mask in buffer rows. A planet behind it is not named, not hoverable and not clickable (it is still drawn: the wafer simply
+// covers it). The wafer has been removed (a local copy is in archive/, which git ignores); without its canvas the mask
+// stays empty.
 let waferMask = new Uint8Array(0), waferSum = new Int32Array(0);   // ... and its running sums (names keep out from under it)
 function buildWaferMask() {
   const wc = document.querySelector('.wafer-canvas');
