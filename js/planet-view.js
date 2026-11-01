@@ -3,9 +3,9 @@
 // planet's real axial tilt. Moons (and, for Earth, satellites) orbit it on tilted ellipses, passing in front of and
 // behind it, each with a floating pixel name. Planet facts come from js/planets.js; per-body orbit settings are below.
 (() => {
-const page = document.querySelector('.page4');
+const layer = document.querySelector('.planet-layer');    // the full-window layer js/solar.js puts over the page
 const solar = document.querySelector('.solar-canvas');
-if (!page || !solar) return;
+if (!layer || !solar) return;
 
 const BUF = 448;                 // buffer size in art pixels (room for moons out to about 4.5 planet radii)
 const PR = 48;                   // planet radius in art pixels (96 across)
@@ -16,7 +16,7 @@ const cv = document.createElement('canvas');
 cv.className = 'planet-canvas';
 cv.width = cv.height = BUF;
 cv.setAttribute('aria-hidden', 'true');
-page.appendChild(cv);
+layer.appendChild(cv);
 const ctx = cv.getContext('2d');
 const img = ctx.createImageData(BUF, BUF);
 const buf = new Uint32Array(img.data.buffer);
@@ -276,7 +276,7 @@ let planet = null;                 // the planet object from js/planets.js
 let orbitScale = 1;                // shrinks the orbits when the space around the planet is narrow
 let stats = { labels: 0, placed: 0, skipped: 0, rects: [] };
 let mode = 'wide';                 // 'wide' (callouts around the planet), 'list' or 'phone' (from solar.solarView())
-let box = { left: 0, top: 0, k: 1 }; // where the buffer sits on the page: css px = left + buffer px * k
+let box = { left: 0, top: 0, k: 1 }; // where the buffer sits in the window: css px = left + buffer px * k
 let obstacles = [];                // callout rects (css px): the floating names keep clear of them
 let screen = { w: 1e9, h: 1e9 };   // the viewport (css px): names must stay on screen
 
@@ -721,7 +721,7 @@ function orbitItems(fr, t) {
   });
 }
 
-// where the planet, its axis guides and its moon orbits are, in css px relative to the page (the callouts are laid out from
+// where the planet, its axis guides and its moon orbits are, in css px relative to the window (the callouts are laid out from
 // this). For Pluto, which circles the shared point with Charon, the guides are where they are now (`sweep` holds every
 // place they pass through, so callouts keep clear of all of them) and `moving` asks for leaders that follow.
 function geometry(t = 0) {
@@ -788,16 +788,14 @@ function place(view) {
   mode = view.mode;
   box = { left: cx - size / 2, top: cy - size / 2, k: size / BUF };
   screen = { w: view.cssW, h: view.cssH };
-  // keep the orbits inside the screen and out of the bio, which keeps the left half; on the narrower layouts they also
-  // stay within the planet's own band, so they do not run through the list of facts underneath
-  const colEdge = mode === 'phone' ? 8 : view.cssW / 2 + 24;
-  let avail = Math.min(cx - colEdge, view.cssW - cx - 8, cy - 8, view.cssH - cy - 8);
+  // keep the orbits inside the screen; on the narrower layouts they also stay within the planet's own band, so they do not
+  // run through the list of facts underneath
+  let avail = Math.min(cx - 8, view.cssW - cx - 8, cy - 8, view.cssH - cy - 8);
   if (mode !== 'wide') avail = Math.min(avail, 1.6 * Rcss);
   const base = squeezeBase(planet.id);
   const maxOrbit = Math.max(base, ringOuter(planet.id), ...bodiesFor(planet).map((b) => b.orbit + (b.r || 2) / PR), ...(planet.members || []).map((n) => (MEMBERS[n] ? MEMBERS[n].d + (MEMBERS[n].r * (MEMBERS[n].stretch || 1)) / PR : 1)));
-  // rocks drift across the right half only (all of the screen on phones)
-  const fx0 = mode === 'phone' ? 0 : (view.cssW / 2 + 16 - box.left) / box.k;
-  fieldRange = [Math.max(0, fx0), Math.min(BUF, (view.cssW - box.left) / box.k)];
+  // rocks drift across the whole window
+  fieldRange = [Math.max(0, -box.left / box.k), Math.min(BUF, (view.cssW - box.left) / box.k)];
   // the outermost orbit must fit in `avail`: Rcss * (base + (maxOrbit - base) * scale) <= avail
   orbitScale = Math.min(1, Math.max(0.15, (avail / (Rcss * 1.06) - base) / Math.max(0.01, maxOrbit - base)));
 }

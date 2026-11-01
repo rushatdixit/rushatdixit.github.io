@@ -667,7 +667,6 @@ html {
 .planet-canvas {
   position: absolute;
   z-index: 1;
-  translate: 0 var(--frame-top, 0px);   /* drawn in the solar frame's coordinates (js/solar.js sets --frame-top on about) */
   display: block;
   opacity: 0;
   pointer-events: none;
@@ -700,20 +699,35 @@ html {
   outline-offset: 2px;
 }
 
-/* ---- the bio in a planet view: it stays, narrowing to the left half in step with the zoom (js/solar.js sets its width
-   and --bio-scale every frame, so its lines rewrap as it goes) ---- */
-.page4-scroll { display: contents; }
+/* ---- the planet close-up: a full-window layer over the page (js/solar.js). Its pixel canvas holds the zoom and the body's
+   background; the close-up (js/planet-view.js) and the facts (js/planet-callouts.js) sit on top. The page under it does
+   not scroll while it is open (html.planet-locked); the gutter is kept, so locking never shifts the page sideways ---- */
+html { scrollbar-gutter: stable; }
+html.planet-locked { overflow: hidden; }
 
-.page4-hint { transition: opacity 0.3s ease; }
-.page4.planet-open .page4-hint { opacity: 0; pointer-events: none; }   /* it would sit under the fun fact */
+.planet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.planet-layer[hidden] { display: none; }
+
+.planet-layer-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  image-rendering: pixelated;
+}
 
 /* ---- the planet's facts (js/planet-callouts.js): pixel text, no boxes; a 1 px black pixel outline keeps it readable ---- */
 .planet-info {
   --co-scale: 1;
   --co-dim: #a4a7bb;
   position: absolute;
-  inset: var(--frame-top, 0px) 0 auto 0;   /* over the solar frame, which ends at the bottom of about */
-  height: var(--frame-h, 100%);
+  inset: 0;
   z-index: 3;
   pointer-events: none;
   font-family: "Press Start 2P", ui-monospace, monospace;
@@ -729,11 +743,11 @@ html {
 .planet-head {
   position: absolute;
   top: 48px;
-  left: calc(50% + 24px);
+  left: 48px;                  /* the top-left corner: the planet is in the middle, its facts on both sides */
   opacity: 0;
   transition: opacity 0.2s ease;
 }
-.planet-info.is-active .planet-head { opacity: 1; transition: opacity 0.3s ease 0.3s; }
+.planet-info.is-active .planet-head { opacity: 1; transition: opacity 0.3s ease 0.75s; }   /* once the background covers the page */
 
 .planet-back {
   display: inline-block;
@@ -849,7 +863,9 @@ html {
 
 /* 768 to 1099 px (and wide screens too short for callouts): a plain list in two columns under the planet */
 .planet-info[data-mode="list"] .planet-callouts {
-  inset: auto 48px auto calc(50% + 24px);
+  inset: auto auto auto 50%;   /* centred under the planet */
+  translate: -50% 0;
+  width: min(calc(100% - 96px), 760px);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: calc(14px * var(--co-scale)) calc(24px * var(--co-scale));
@@ -867,39 +883,26 @@ html {
 .planet-info[data-mode="phone"] .pc-a-moons .pc-value + .pc-value::before { content: ", "; }
 
 @media (prefers-reduced-motion: reduce) {
-  .planet-head, .planet-callout, .planet-leaders line, .moons-more, .page4-hint { transition: none !important; }
+  .planet-head, .planet-callout, .planet-leaders line, .moons-more { transition: none !important; }
 }
 
-@media (max-width: 767px) {
-  /* phones: the planet at the top, then one scrolling column with the facts and then the bio */
-  .page4-text { transition: opacity 0.3s ease 0.2s; }
-  .page4.planet-open .page4-text { opacity: 0; transition: opacity 0.2s ease; }
-  .page4.planet-open.planet-shown .page4-text { position: static; max-width: none; margin-top: 2.6rem; opacity: 1; transition: opacity 0.3s ease 0.25s; }
-  .page4.planet-shown .page4-scroll {
-    display: block;
-    position: absolute;
-    z-index: 3;
-    top: calc(var(--frame-top, 0px) + var(--info-top, 60vw));
-    left: var(--edge-gap);
-    right: var(--edge-gap);
-    bottom: 0;
-    padding-bottom: var(--edge-gap);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
-  }
-  .page4.planet-shown .planet-info { position: static; }
-  .page4.planet-shown .page4-pluto,
-  .page4.planet-shown .page4-sun { opacity: 0; }
-  .planet-info[data-mode="phone"] .planet-head { position: static; opacity: 0; }
-  .planet-info[data-mode="phone"].is-revealed .planet-head { opacity: 1; }
-  .planet-info[data-mode="phone"] .planet-callouts {
-    position: static;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 14px;
-    margin-top: 16px;
-  }
+/* phones: the planet at the top, then the name and the facts in one scrolling column under it */
+.planet-info[data-mode="phone"] {
+  inset: var(--info-top, 60vw) var(--edge-gap) 0;
+  padding-bottom: var(--edge-gap);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  pointer-events: auto;
+}
+.planet-info[data-mode="phone"] .planet-head { position: static; opacity: 0; }
+.planet-info[data-mode="phone"].is-revealed .planet-head { opacity: 1; }
+.planet-info[data-mode="phone"] .planet-callouts {
+  position: static;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 16px;
 }
 
 @media (max-width: 700px) {

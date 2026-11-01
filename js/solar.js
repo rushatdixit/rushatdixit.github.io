@@ -765,7 +765,20 @@ const FADE_MS = reduceMotion ? 0 : 220;     // the callouts fade out for this lo
 let closing = false, closeTimer = 0;
 let headH = 80, listH = 0;                  // heights of the planet's name block and its list of facts (the list layout fits the planet between them)
 const bio = page.querySelector('.page4-text');
-let bioFrom = 0, bioTo = 0, bioScale = 1, bioZoom = -1;   // the bio's width (css px) closed and open, its open font scale
+// the close-up is a full-window layer over the page (position: fixed): its own pixel canvas for the zoom and the body's
+// background, then the detailed close-up (js/planet-view.js) and the facts (js/planet-callouts.js) on top. The page under
+// it keeps its place and does not scroll while it is open.
+const layer = document.createElement('div');
+layer.className = 'planet-layer';
+layer.hidden = true;
+const lcv = document.createElement('canvas');
+lcv.className = 'planet-layer-canvas';
+lcv.setAttribute('aria-hidden', 'true');
+layer.appendChild(lcv);
+document.body.appendChild(layer);
+const lctx = lcv.getContext('2d');
+let LH = 1, limg = null, lbuf = null, pbuf = null;   // the layer's rows, its image, and the travelling body drawn on its own
+const winW = () => document.documentElement.clientWidth, winH = () => window.innerHeight;
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const lerp = (a, b, t) => a + (b - a) * t;
 let cssW = 1, cssH = 1, colRight = 0, frameCss = 0;       // canvas size and the right edge of the text column, in css px
@@ -945,6 +958,7 @@ function scenery(t, tOut) {
       (isOuter(b) || p.zv > sunZv ? far : near).push(body);        // the outer bodies never go in front of the sun
     }
     for (const k of moons) {
+      if (view.id === b.id && view.t > 0) break;             // (the open planet's moons go with it, onto the close-up layer)
       const r = k.m.bary ? p.R / 2 : k.m.r;                  // Charon: half Pluto's size
       if (k.m.bary) discs.push([k.sx, k.sy, r / k.zv]);
       const mb = { zv: k.zv, draw: () => speck(k.sx, k.sy, r / k.zv, scale(k.m.color, brightFor(k.near))) };
@@ -980,8 +994,6 @@ function stars() {
 }
 
 function draw(t, tOut = clockOut) {
-  // the bio narrows to the left half in step with the camera, so its text (and the dimming behind it) moves every frame
-  if (syncBio(view.id ? easeInOut(view.t) : 0)) measureText();
   placed = BODIES.map((b, i) => idle(i));
   sunSeen = null;
   let sc;
@@ -1067,7 +1079,7 @@ function draw(t, tOut = clockOut) {
   labelInfo = { visible: 0, labelled: 0, moved: 0, missed: [] };
   labelOff = [];
   // (a planet behind the wafer has no name: the wafer covers it)
-  const named = placed.filter((p) => p.active && !p.clipped && p.sx >= 0 && p.sx <= W && p.sy >= YMIN && p.sy <= YMAX && !p.hidden && !behindWafer(p.sx, p.sy) && (!running || isOnScreen(p.i, undefined, false)))
+  const named = placed.filter((p) => p.b.id !== view.id && p.active && !p.clipped && p.sx >= 0 && p.sx <= W && p.sy >= YMIN && p.sy <= YMAX && !p.hidden && !behindWafer(p.sx, p.sy) && (!running || isOnScreen(p.i, undefined, false)))
     .concat((kNamed || []).map((k) => ({ sx: k.sx, sy: k.sy, R: k.R, b: { name: k.m.name } })));
   for (const p of named) {
     labelInfo.visible++;
@@ -1141,34 +1153,10 @@ function draw(t, tOut = clockOut) {
   if (kuiperOn && !sceneMoving()) beltLabel(kRocks, 'KUIPER BELT');
   lastLabels = labelRects;
 
-  // zoom: everything but the open planet fades out, and the planet travels to (and grows into) its close-up position.
-  // With reduced motion there is no travel: the overview just crossfades to the planet at its final place.
-  if (tgt && zoom > 0) {
-    const e = endState(), m = reduceMotion ? 1 : zoom;
-    const lx = -tgt.x, ly = tgt.h * CE - tgt.z * SE, lz = -(tgt.h * SE + tgt.z * CE);      // towards the sun
-    if (!view.light) { const n = Math.hypot(lx, ly, lz) || 1; view.light = [lx / n, ly / n, lz / n]; }
-    // the overview (sun, orbits, belt, other planets) fades into the planet's background, which is dithered to match the pixel style
-    ensureBackground(tgt, e);
-    if (bgBuf) {
-      const keep = 1 - zoom, top = TOP * W, end = (TOP + H) * W;
-      for (let i = 0; i < buf.length; i++) {                 // the rows above and below the frame: the overview fades to black
-        if (i === top) i = end;
-        if (i >= buf.length) break;
-        const c = buf[i];
-        buf[i] = rgb((c & 255) * keep, ((c >> 8) & 255) * keep, ((c >> 16) & 255) * keep);
-      }
-      for (let i = top; i < end; i++) {
-        const c = buf[i], b = bgBuf[i - top], k = zoom * (1 - 0.4 * (1 - dimFull[i]));      // only a gentle dim behind text: the gradient is already dark there
-        buf[i] = rgb(Math.min(255, (c & 255) * keep + (b & 255) * k), Math.min(255, ((c >> 8) & 255) * keep + ((b >> 8) & 255) * k), Math.min(255, ((c >> 16) & 255) * keep + ((b >> 16) & 255) * k));
-      }
-    }
-    // the travelling planet; the detailed close-up (js/planet-view.js) takes over over the last quarter of the zoom
-    const closeUp = clamp01((zoom - 0.75) / 0.25);
-    const alpha = (reduceMotion ? zoom : 1) * (1 - closeUp);
-    const tx = lerp(tgt.sx, e.x, m), ty = lerp(tgt.sy, e.y, m), tr = lerp(tgt.R, e.R, m);
-    if (alpha > 0 && tgt.kind === 'sun') sunDisc(tx, ty, tr, alpha);       // the camera pans from the corner as it zooms
-    else if (alpha > 0) sphere(tx, ty, tr, (TAU * t) / tgt.b.spin, tgt.b.colorAt, lx, ly, lz, lerp(brightFor(tgt.near), 1, m), alpha);
-  }
+  // zoom: on the layer over the page, the body's background fades in over everything while the body travels from where it
+  // is on the page to (and grows into) its close-up position. With reduced motion there is no travel: it crossfades in.
+  if (tgt && zoom > 0) drawZoom(t, tgt, zoom);
+  else if (!layer.hidden && lbuf) lctx.clearRect(0, 0, lcv.width, lcv.height);
 
   updateButtons();
   if (r1 > r0) ctx.putImageData(img, 0, 0, 0, r0, W, r1 - r0);       // upload just the rows on screen
@@ -1200,10 +1188,6 @@ function measureText() {
       if (!n.nodeValue.trim() || n.parentElement.closest('canvas, script, style')) continue;
       if (n.parentElement.closest('.planet-info')) continue;              // the callouts carry their own pixel outline: no dimming
       if (n.parentElement.closest('[hidden]') || getComputedStyle(n.parentElement).visibility === 'hidden') continue;
-      // on phones the bio is faded out while the view opens or closes (it moves under the facts once the zoom is done)
-      if (stackHidden() && n.parentElement.closest('.page4-text')) continue;
-      if (page.classList.contains('planet-open') && n.parentElement.closest('.page4-hint')) continue;          // faded out
-      if (viewMode() === 'phone' && page.classList.contains('planet-shown') && n.parentElement.closest('.page4-pluto, .page4-sun')) continue;
       const range = document.createRange();
       range.selectNodeContents(n);
       const blk = perBlock && (n.parentElement.closest('.hf-headline, .hf-brand-text a, .brand-note, .hf-body p, .hobbies-note') || n.parentElement);
@@ -1350,8 +1334,7 @@ function resize() {
   TOP = Math.max(0, Math.round((fb - ph) / q));        // the rows above it (hackerfab, the top of about)
   BOT = Math.max(0, Math.ceil((ch - fb) / q));         // and below it (projects)
   BH = TOP + H + BOT;
-  page.style.setProperty('--frame-top', (fb - ph) - (page.getBoundingClientRect().top - box.top) + 'px');   // for the close-up (js/planet-view.js, planet-callouts.js)
-  page.style.setProperty('--frame-h', ph + 'px');
+
   D = Math.hypot(W, H);
   canvas.width = W;
   canvas.height = BH;
@@ -1362,9 +1345,56 @@ function resize() {
   measureText();                                       // first, so the outer planets' arcs can keep off the bio
   buildWaferMask();                                    // (and the Kuiper belt's named bodies off the wafer)
   layout();
-  if (view.id) { measureBio(); measureInfo(); }
+  if (view.id) measureInfo();
   measureText();
   draw(now());
+}
+
+// the layer's pixel canvas: the window, at the overview's pixel size
+function sizeLayer() {
+  const lh = Math.max(8, Math.ceil(winH() / PX));
+  if (lbuf && lcv.width === W && lcv.height === lh) return;
+  LH = lh;
+  lcv.width = W; lcv.height = LH;
+  lcv.style.width = W * PX + 'px'; lcv.style.height = LH * PX + 'px';
+  limg = lctx.createImageData(W, LH);
+  lbuf = new Uint32Array(limg.data.buffer);
+  pbuf = new Uint32Array(W * LH);
+}
+
+// one frame of the zoom on the layer: the body's background (or black) at `zoom` opacity over the page, and the body itself
+// over that, travelling from its place on the page (where it is no longer drawn) to its close-up place
+function drawZoom(t, tgt, zoom) {
+  sizeLayer();
+  const e = endState(), m = reduceMotion ? 1 : zoom;
+  const lx = -tgt.x, ly = tgt.h * CE - tgt.z * SE, lz = -(tgt.h * SE + tgt.z * CE);      // towards the sun
+  if (!view.light) { const n = Math.hypot(lx, ly, lz) || 1; view.light = [lx / n, ly / n, lz / n]; }
+  ensureBackground(tgt, e);
+  // where the body is on the page right now, in the layer's pixels (the layer is the window; PX css px to a pixel)
+  const qx = lay.w / W, qy = lay.h / BH;
+  const sx0 = (tgt.sx * qx + lay.left - window.scrollX) / PX, sy0 = ((tgt.sy + TOP) * qy + lay.top - window.scrollY) / PX;
+  // the travelling body, drawn on its own; the detailed close-up (js/planet-view.js) takes over over the last quarter
+  const alpha = (reduceMotion ? zoom : 1) * (1 - clamp01((zoom - 0.75) / 0.25));
+  pbuf.fill(0);
+  if (alpha > 0) {
+    const tx = lerp(sx0, e.x, m), ty = lerp(sy0, e.y, m), tr = lerp((tgt.R * qx) / PX, e.R, m);
+    const keep = [buf, H, TOP, BOT];
+    [buf, H, TOP, BOT] = [pbuf, LH, 0, 0];             // the drawing helpers write to `buf` in frame rows: point them here
+    try {
+      if (tgt.kind === 'sun') sunDisc(tx, ty, tr, 1);
+      else sphere(tx, ty, tr, (TAU * t) / tgt.b.spin, tgt.b.colorAt, lx, ly, lz, lerp(brightFor(tgt.near), 1, m), 1);
+    } finally { [buf, H, TOP, BOT] = keep; }
+  }
+  // composite (straight alpha, as ImageData wants): the background at `zoom`, the body at `alpha` over it
+  const za = zoom, aBg = Math.round(za * 255) << 24;
+  for (let i = 0, n = W * LH; i < n; i++) {
+    const b = bgBuf ? bgBuf[i] : 0xff000000, p = pbuf[i];
+    if (alpha <= 0 || !(p >>> 24)) { lbuf[i] = (aBg | (b & 0xffffff)) >>> 0; continue; }
+    const A = alpha + za * (1 - alpha), wp = alpha / A, wb = 1 - wp;
+    lbuf[i] = ((Math.round(A * 255) << 24) | (Math.round(((p >> 16) & 255) * wp + ((b >> 16) & 255) * wb) << 16)
+      | (Math.round(((p >> 8) & 255) * wp + ((b >> 8) & 255) * wb) << 8) | Math.round((p & 255) * wp + (b & 255) * wb)) >>> 0;
+  }
+  lctx.putImageData(limg, 0, 0);
 }
 
 // ---- backgrounds: a radial gradient that starts at the side of the planet facing the sun and fades to black ----
@@ -1373,25 +1403,25 @@ const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 function ensureBackground(tgt, e) {
   const data = PLANET_DATA[view.id], bg = data && data.background;
   const L = view.light || [0.6, 0.5, 0.6];
-  const key = [view.id, W, H, Math.round(e.x), Math.round(e.y), L[0].toFixed(2), L[1].toFixed(2)].join('|');
+  const key = [view.id, W, LH, Math.round(e.x), Math.round(e.y), L[0].toFixed(2), L[1].toFixed(2)].join('|');
   if (key === bgKey && bg && bg.type !== 'animation') return;
   bgKey = key;
   if (!bg) { bgBuf = null; return; }
   if (bg.type === 'animation') {                       // an animated pixel background (js/backgrounds.js), drawn every frame
     if (typeof bg.render !== 'function') { bgBuf = null; return; }
-    if (!bgBuf || bgBuf.length !== W * H) bgBuf = new Uint32Array(W * H);
+    if (!bgBuf || bgBuf.length !== W * LH) bgBuf = new Uint32Array(W * LH);
     // a wall clock, not the orbit clock (that one stops while a view is open); one still frame with reduced motion
     const t = reduceMotion ? 20 : performance.now() / 1000;
-    bg.render(bgBuf, t, W, H, { cx: e.x, cy: e.y, R: e.R, light: L });
+    bg.render(bgBuf, t, W, LH, { cx: e.x, cy: e.y, R: e.R, light: L });
     return;
   }
   const stops = bg.stops.map(([p, hex]) => [p, parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]);
   // centre: the sun-facing limb, or the body itself (the Sun's own glow)
   const n = Math.hypot(L[0], L[1]) || 1, onBody = bg.center === 'body';
   const gx = onBody ? e.x : e.x + (L[0] / n) * e.R * 0.85, gy = onBody ? e.y : e.y + (L[1] / n) * e.R * 0.85;
-  const Rg = Math.hypot(W, H) * 0.7, BANDS = 14;
-  bgBuf = new Uint32Array(W * H);
-  for (let y = 0; y < H; y++) {
+  const Rg = Math.hypot(W, LH) * 0.7, BANDS = 14;
+  bgBuf = new Uint32Array(W * LH);
+  for (let y = 0; y < LH; y++) {
     for (let x = 0; x < W; x++) {
       const t = Math.min(1, Math.hypot(x - gx, y - gy) / Rg);
       const dither = (BAYER4[((y & 3) << 2) | (x & 3)] + 0.5) / 16 - 0.5;           // ordered dither, then quantised into bands
@@ -1405,29 +1435,28 @@ function ensureBackground(tgt, e) {
 }
 
 // which layout the open view uses: 'wide' (1100 px and up: callouts around the planet), 'list' (768 to 1099 px: the facts
-// as a list under the planet) or 'phone' (planet, facts, then the bio, stacked)
-const viewMode = () => (cssW >= 1100 ? 'wide' : cssW >= 768 ? 'list' : 'phone');
-const stackHidden = () => viewMode() === 'phone' && page.classList.contains('planet-open') && !page.classList.contains('planet-shown');
+// as a list under the planet) or 'phone' (the planet, then the facts in a scrolling column)
+const viewMode = () => { const w = winW(); return w >= 1100 ? 'wide' : w >= 768 ? 'list' : 'phone'; };
 const AXIS_UP = 1.5;                        // the rotation axis and its "N" reach this many radii above the centre
 
-// the open planet's final centre and radius (art pixels). Wide: 38vmin across, centred in the right half (shrunk only if
-// that half is too small for 48 px of clear space). List: about 30vmin, at the top of the right half under the name.
-// Phones: about 60vw across at the top.
+// the open planet's final centre and radius, in the layer's pixels (the window). Wide: 38vmin across, in the middle of the
+// window (smaller only if that leaves under 48 px of clear space around it), with the facts on both sides. List: about
+// 30vmin, centred under the name. Phones: about 60vw across at the top.
 function endState() {
-  const mode = viewMode(), gap = 48, half = cssW / 2;
+  const mode = viewMode(), gap = 48, vw = winW(), vh = winH(), half = vw / 2;
   let r, x, y;
-  if (mode === 'phone') { r = 0.3 * cssW; x = cssW / 2; y = gap + AXIS_UP * r; }
+  if (mode === 'phone') { r = 0.3 * vw; x = vw / 2; y = gap + AXIS_UP * r; }
   else if (mode === 'list') {
     // about 30vmin, smaller if the facts underneath would not fit: name, planet with its axis (3 radii tall) and orbits
     // (moons and satellites stay within 1.6 radii in this layout), list
     const data = PLANET_DATA[view.id] || {};
     const below = (data.moons || []).length || (data.satellites || []).length || (data.members || []).length ? 1.6 : AXIS_UP;
-    const room = (cssH - 2 * gap - headH - 32 - listH) / (AXIS_UP + below);
-    r = Math.max(24, Math.min(0.15 * Math.min(cssW, cssH), (half - 2 * gap) / 2, room));
-    x = half * 1.5; y = gap + headH + 16 + AXIS_UP * r;
+    const room = (vh - 2 * gap - headH - 32 - listH) / (AXIS_UP + below);
+    r = Math.max(24, Math.min(0.15 * Math.min(vw, vh), (half - 2 * gap) / 2, room));
+    x = half; y = gap + headH + 16 + AXIS_UP * r;
   } else {
-    r = Math.max(24, Math.min(0.19 * Math.min(cssW, cssH), (half - 2 * gap) / 2, (cssH - 2 * gap) / 2));
-    x = half * 1.5; y = cssH / 2;
+    r = Math.max(24, Math.min(0.19 * Math.min(vw, vh), (half - 2 * gap) / 2, (vh - 2 * gap) / 2));
+    x = half; y = vh / 2;
   }
   // a body whose close-up is wider than its disc (Saturn's rings, Pluto circling with Charon) is drawn smaller
   const k = (PLANET_DATA[view.id] || {}).closeupScale || 1;
@@ -1436,45 +1465,11 @@ function endState() {
 
 // the name block's and the fact list's heights (filled in by js/planet-callouts.js on planet-open)
 function measureInfo() {
-  const head = page.querySelector('.planet-head'), list = page.querySelector('.planet-callouts');
+  const head = layer.querySelector('.planet-head'), list = layer.querySelector('.planet-callouts');
   if (head) headH = head.offsetHeight || headH;
   listH = list && viewMode() === 'list' ? list.offsetHeight : 0;
 }
 
-// the bio's width and type size for the open layouts: it keeps the left half, and its type shrinks a little (to 0.7 at
-// most) when the narrower column would otherwise run into the caption at the bottom
-function measureBio() {
-  if (!bio) return;
-  const keepW = bio.style.width, keepS = bio.style.getPropertyValue('--bio-scale');
-  bio.style.width = ''; bio.style.removeProperty('--bio-scale');
-  bioFrom = bio.getBoundingClientRect().width;
-  bioTo = bioFrom; bioScale = 1;
-  if (viewMode() !== 'phone') {
-    const pluto = page.querySelector('.page4-pluto:not([hidden]), .page4-sun:not([hidden])');
-    const avail = (pluto ? pluto.offsetTop - 16 : cssH - 48) - bio.offsetTop;
-    bioTo = Math.min(bioFrom, cssW / 2 - bio.offsetLeft - 24);
-    bio.style.width = bioTo + 'px';
-    for (let s = 1; s >= 0.7 - 1e-9; s -= 0.05) {
-      bioScale = s;
-      bio.style.setProperty('--bio-scale', s.toFixed(2));
-      if (bio.offsetHeight <= avail) break;
-    }
-  }
-  bio.style.width = keepW;
-  if (keepS) bio.style.setProperty('--bio-scale', keepS); else bio.style.removeProperty('--bio-scale');
-  bioZoom = -1;
-}
-
-// apply the bio's in-between state for this much zoom (0 = overview, 1 = planet view); true when something changed
-function syncBio(z) {
-  if (!bio || z === bioZoom) return false;
-  bioZoom = z;
-  page.style.setProperty('--zoom', z.toFixed(4));
-  if (z <= 0 || viewMode() === 'phone') { bio.style.width = ''; bio.style.removeProperty('--bio-scale'); return true; }
-  bio.style.width = lerp(bioFrom, bioTo, z) + 'px';
-  bio.style.setProperty('--bio-scale', lerp(1, bioScale, z).toFixed(4));
-  return true;
-}
 
 function frame(ts) {
   if (!visible) { running = false; lastTs = null; return; }   // nothing to draw while page 4 is off screen
@@ -1533,7 +1528,7 @@ backLink.textContent = '<- BACK';                  // the pixel font has no arro
 backLink.setAttribute('aria-label', 'Back to the solar system');
 backLink.hidden = true;
 backLink.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); requestClose(); });
-page.appendChild(backLink);
+layer.appendChild(backLink);
 
 // keep every button centred on its planet (at least 44 px so it is easy to hit); hidden while a view is open, during the
 // flight between the scenes, and for the scene that is not shown
@@ -1641,16 +1636,14 @@ function ready() {
 const beltPointFor = (id, pt) => (id === BELT_ID ? pt || defaultBeltPoint() : id === KUIPER_ID ? pt || defaultKuiperPoint() : null);
 function openView(id, push = true, beltPoint = null) {
   if (!openable(id) || (view.id === id && view.dir >= 0 && !closing) || (sceneMoving() && !view.id)) return;
-  const home = sceneOf(id);                         // a link straight to a body in the other scene: jump there first
-  if (home && home !== sceneName()) goScene(home, true);
+  // a link straight to a body that is not in view here (in the other scene): jump to its own scene first. A body clicked
+  // where it is opens from there, and closing comes back to the same view
+  const home = sceneOf(id), here = placed.find((q) => q.b.id === id);
+  const inView = here && here.active && !here.clipped && !here.hidden && isOnScreen(here.i);
+  if (home && home !== sceneName() && !inView) goScene(home, true);
   clearTimeout(closeTimer); closing = false;
   hovered = null; space.style.cursor = '';
-  if (!view.id) {
-    // the about section keeps its height while a body is open (its text rewraps or, on phones, moves under the facts), so
-    // the frame, which ends at its bottom, stays put
-    page.style.height = page.offsetHeight + 'px';
-    measureBio();                                   // the bio's closed width, before anything moves
-  }
+  if (!view.id) lockPage(true);                     // the layer goes over the page, which stays where it is
   view.id = id; view.dir = 1; view.light = id === SUN_ID ? [0, 0, 1] : null;    // the Sun shines by itself
   view.scene = sceneName();                         // closing returns to the scene the body was opened from
   view.beltPoint = beltPointFor(id, beltPoint);
@@ -1661,6 +1654,26 @@ function openView(id, push = true, beltPoint = null) {
   measureInfo();
   if (view.t >= 1) { view.dir = 0; ready(); } else startTick();
   setTimeout(() => backLink.focus({ preventScroll: true }), 50);
+}
+
+// while a body is open the page under the layer is still: it cannot scroll (the layer covers it and the root does not
+// scroll), its content is inert so focus stays on the layer, and closing puts it back exactly where it was
+let savedY = 0;
+const mainEl = document.querySelector('main');
+function lockPage(on) {
+  if (on) {
+    savedY = window.scrollY;
+    layer.hidden = false;
+    sizeLayer();
+    lctx.clearRect(0, 0, lcv.width, lcv.height);
+    document.documentElement.classList.add('planet-locked');
+    if (mainEl) mainEl.inert = true;
+    return;
+  }
+  layer.hidden = true;
+  document.documentElement.classList.remove('planet-locked');
+  if (mainEl) mainEl.inert = false;
+  if (Math.abs(window.scrollY - savedY) > 0.5) window.scrollTo({ top: savedY, behavior: 'instant' });
 }
 
 // closing from the UI goes through history, so the hash and the browser's Back button always agree
@@ -1685,9 +1698,8 @@ function finishClose() {
   const id = view.id;
   view.id = null;
   page.classList.remove('planet-open');
-  page.style.height = '';
   backLink.hidden = true;
-  syncBio(0);
+  lockPage(false);
   measureText();
   updateButtons();
   const btn = buttonFor(id);
@@ -1884,7 +1896,7 @@ canvas.solarTargets = () => {
   }
   return { sun: { x: cx * PX, y: cy * PX, r: rSun * PX }, belt, label: labelInfo };
 };
-canvas.solarView = () => ({ id: view.id, t: view.t, dir: view.dir, zoom: easeInOut(view.t), clock, endState: endState(), colRight, cssW, cssH, PX, light: view.light, reduceMotion, mode: viewMode(), closing });
+canvas.solarView = () => ({ id: view.id, t: view.t, dir: view.dir, zoom: easeInOut(view.t), clock, endState: endState(), colRight, cssW: winW(), cssH: winH(), PX, light: view.light, reduceMotion, mode: viewMode(), closing });
 // the overview's hover labels this frame, in css px (for tests)
 // the Kuiper bodies and the planet discs as drawn last frame, in page-4 art px (rows above page 4 are negative), for tests
 canvas.solarKuiperSeen = () => ({ rocks: lastKuiper.kRocks.map(([sx, sy, s, nr]) => [sx, sy, s.f, nr, radiusThrough(sx, sy, cam.f)]), named: lastKuiper.kNamed.map((k) => [k.m.name, k.sx, k.sy]), kuiperR, plutoR: orbitR[BODIES.findIndex((b) => b.id === 'pluto')], neptuneR: orbitR[BODIES.findIndex((b) => b.id === 'neptune')], TOP, H, W, PX });
@@ -1920,26 +1932,19 @@ space.addEventListener('pointermove', (ev) => {
 }, { passive: true });
 space.addEventListener('pointerleave', () => { if (hovered) { hovered = null; space.style.cursor = ''; redraw(); } }, { passive: true });
 
-// open a body from the overview. If page 4 is not where the close-up needs it (say the planet was clicked up in the
-// hackerfab screen), scroll it into place first, smoothly (instantly with reduced motion), then open as usual
-let pendingOpen = null;
-function openFromOverview(id, beltPoint = null) {
-  if (Math.abs(window.scrollY - lay.page) < 2) { openView(id, true, beltPoint); return; }
-  clearTimeout(pendingOpen);
-  const go = () => { clearTimeout(pendingOpen); pendingOpen = null; window.removeEventListener('scrollend', go); openView(id, true, beltPoint); };
-  window.addEventListener('scrollend', go, { once: true });
-  pendingOpen = setTimeout(go, reduceMotion ? 50 : 1200);   // fallback where scrollend is not supported
-  window.scrollTo({ top: lay.page, behavior: reduceMotion ? 'instant' : 'smooth' });
-}
+// open a body from the overview, wherever the page is: the close-up is a layer over it
+const openFromOverview = (id, beltPoint = null) => openView(id, true, beltPoint);
+
+// on the layer, a click on empty space closes; the name, the back link, the facts and the body itself do not
+layer.addEventListener('click', (ev) => {
+  if (!view.id || ev.target.closest('.planet-head, .planet-callout, .planet-info[data-mode="phone"]')) return;
+  const e = endState();
+  if (Math.hypot(ev.clientX / PX - e.x, ev.clientY / PX - e.y) <= e.R) return;
+  requestClose();
+});
 
 space.addEventListener('click', (ev) => {
-  if (view.id) {                                       // empty space on page 4 closes; the text, the back link and the body do not
-    if (!ev.target.closest('.page4')) return;
-    const e = endState(), [ax, ay] = toArt(ev.clientX, ev.clientY);
-    const onPlanet = Math.hypot(ax - e.x, ay - e.y) <= e.R;
-    if (!onPlanet && !ev.target.closest('.page4-text, .planet-info')) requestClose();
-    return;
-  }
+  if (view.id) return;
   if (ev.target.closest(INTERACTIVE)) return;          // a link (or any control) over the canvas keeps its click
   const hit = targetAt(ev);
   canvas.dispatchEvent(new CustomEvent('solar-click', { detail: { name: nameOf(hit) } }));   // hook for what comes next
@@ -1976,7 +1981,6 @@ if (document.fonts) {
   document.fonts.addEventListener && document.fonts.addEventListener('loadingdone', remeasure);
 }
 window.addEventListener('load', remeasure);
-canvas.addEventListener('text-moved', () => { measureText(); redraw(); });     // the phone layout scrolls the bio under the facts
 if (window.ResizeObserver && bio) new ResizeObserver(remeasure).observe(bio);
 
 // a link like /#mars opens that planet (after a normal zoom, or the short crossfade with reduced motion). It waits until

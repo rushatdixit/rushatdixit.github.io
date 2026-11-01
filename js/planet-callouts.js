@@ -3,15 +3,13 @@
 // out from the planet's real size, axis and orbits so nothing overlaps. Narrower screens get a plain list under the planet.
 // Everything is built from the table in js/planets.js, so a new planet needs no changes here.
 (() => {
-const page = document.querySelector('.page4');
+const layer = document.querySelector('.planet-layer');    // the full-window layer js/solar.js puts over the page
 const canvas = document.querySelector('.solar-canvas');
 const back = document.querySelector('.planet-back');
-const bio = page && page.querySelector('.page4-text');
-const scroller = page && page.querySelector('.page4-scroll');
-if (!page || !canvas || !back || !bio || !scroller) return;
+if (!layer || !canvas || !back) return;
 
 const MAX_MOONS_SHOWN = 5;
-const EDGE = 48;            // clear space to the screen edges and the bio
+const EDGE = 48;            // clear space to the window's edges
 const PAD = 12;             // between callouts, and around the planet
 const GUIDE_PAD = 8;        // around the axis, the angle arc and the spin arrow
 const STEP = 6;             // candidate grid, in css px
@@ -30,7 +28,7 @@ const info = el('section', 'planet-info');
 info.setAttribute('aria-live', 'polite');
 info.setAttribute('aria-label', 'Planet facts');
 info.inert = true;
-scroller.insertBefore(info, bio);                    // on phones the facts come first, then the bio
+layer.appendChild(info);                             // over the close-up (on phones, a scrolling column under it)
 const head = el('div', 'planet-head');
 head.appendChild(back);                              // the back link sits above the name
 const title = el('h2', 'planet-name');
@@ -114,7 +112,7 @@ function render(p) {
 }
 
 /* ------------------------------------------------------------------ *
- *  Geometry helpers (css px, relative to the page)
+ *  Geometry helpers (css px, relative to the window)
  * ------------------------------------------------------------------ */
 const overlap = (a, b, pad) => a.x < b.x + b.w + pad && a.x + a.w + pad > b.x && a.y < b.y + b.h + pad && a.y + a.h + pad > b.y;
 const nearestOnRect = (r, p) => ({ x: Math.max(r.x, Math.min(p.x, r.x + r.w)), y: Math.max(r.y, Math.min(p.y, r.y + r.h)) });
@@ -135,30 +133,11 @@ const segHitsDisc = (a, b, d, pad) => {
   const t = Math.max(0, Math.min(1, ((d.x - a.x) * vx + (d.y - a.y) * vy) / l2));
   return Math.hypot(a.x + vx * t - d.x, a.y + vy * t - d.y) < d.r + pad;
 };
-// the solar frame's top-left on screen: the close-up is laid out in it (js/solar.js sets --frame-top on about)
-const frameOrigin = () => {
-  const pr = page.getBoundingClientRect();
-  return { left: pr.left, top: pr.top + (parseFloat(page.style.getPropertyValue('--frame-top')) || 0) };
-};
+// a node's box relative to the layer (the window)
 const pageRect = (node) => {
-  const pr = frameOrigin(), r = node.getBoundingClientRect();
-  return { x: r.left - pr.left, y: r.top - pr.top, w: r.width, h: r.height };
+  const lr = layer.getBoundingClientRect(), r = node.getBoundingClientRect();
+  return { x: r.left - lr.left, y: r.top - lr.top, w: r.width, h: r.height };
 };
-// the scene captions ("<- towards pluto" / "towards the sun ->") that are showing: callouts keep off them
-const captionRects = () => [...page.querySelectorAll('.page4-pluto, .page4-sun')].filter((el) => !el.hidden && el.offsetWidth).map(pageRect);
-// the right edge of the bio's text, line by line
-function bioRight() {
-  let right = 0;
-  const pr = frameOrigin();
-  const walker = document.createTreeWalker(bio, NodeFilter.SHOW_TEXT);
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    if (!n.nodeValue.trim()) continue;
-    const range = document.createRange();
-    range.selectNodeContents(n);
-    for (const r of range.getClientRects()) right = Math.max(right, r.right - pr.left);
-  }
-  return right;
-}
 
 /* ------------------------------------------------------------------ *
  *  Layout
@@ -202,7 +181,7 @@ function layoutWide(v, g, scale) {
   info.style.setProperty('--co-scale', scale);
   clearPositions();
   const W = v.cssW, H = v.cssH, disc = g.disc;
-  const xMin = Math.ceil(Math.max(W / 2 + 24, bioRight() + EDGE)), xMax = Math.floor(W - EDGE), yMin = EDGE, yMax = Math.floor(H - EDGE);
+  const xMin = EDGE, xMax = Math.floor(W - EDGE), yMin = EDGE, yMax = Math.floor(H - EDGE);
   const headR = pageRect(head);
   const axisPts = [];
   const axLen = Math.hypot(g.axis.x2 - g.axis.x1, g.axis.y2 - g.axis.y1);
@@ -253,7 +232,7 @@ function layoutWide(v, g, scale) {
     slots.push(Object.assign({ key }, zones[z]));
   }
 
-  const taken = [headR].concat(captionRects());              // the name, and the scene caption in the corner
+  const taken = [headR];                                     // the name
   const leaders = [];
   placedRects = [];
   for (const s of slots) {
@@ -330,13 +309,13 @@ function layoutList(v, g) {
   clearPositions();
   let top = Math.max(g.bottom, g.disc.y + g.outer) + 16;
   list.style.top = top + 'px';
-  // the list ends above the scene caption in the corner (or the screen's edge margin)
-  const floor = Math.min(v.cssH - EDGE, ...captionRects().map((r) => r.y - PAD));
+  // the list ends above the window's edge margin
+  const floor = v.cssH - EDGE;
   for (const scale of SCALES.filter((s) => s <= LIST_SCALE)) {
     info.style.setProperty('--co-scale', scale);
     if (top + list.offsetHeight <= floor) break;
   }
-  // never off screen: a list that still does not fit under the body moves up (over the field around it, never over the bio)
+  // never off screen: a list that still does not fit under the body moves up (over the field around it)
   if (top + list.offsetHeight > floor) { top = Math.max(EDGE + head.offsetHeight + 16, floor - list.offsetHeight); list.style.top = top + 'px'; }
   placedRects = Object.entries(items).map(([key, c]) => Object.assign({ key }, pageRect(c)));
 }
@@ -351,7 +330,7 @@ function layout() {
   if (mode === 'phone') {
     clearPositions();
     info.style.setProperty('--co-scale', 1);
-    page.style.setProperty('--info-top', Math.round(Math.max(g.bottom, g.disc.y + g.outer) + 12) + 'px');
+    info.style.setProperty('--info-top', Math.round(Math.max(g.bottom, g.disc.y + g.outer) + 12) + 'px');
     placedRects = [];
   } else if (mode === 'wide') {
     if (!SCALES.some((s) => layoutWide(v, g, s))) { mode = 'list'; info.dataset.mode = 'list'; layoutList(v, g); }
@@ -380,6 +359,7 @@ canvas.addEventListener('planet-open', (ev) => {
   info.dataset.mode = canvas.solarView().mode;
   info.style.setProperty('--co-scale', info.dataset.mode === 'list' ? LIST_SCALE : 1);   // so the list's height can be read now
   info.inert = false;
+  getComputedStyle(head).opacity;                    // the layer has only just been shown: settle its style first, so the name fades in
   info.classList.add('is-active');
   if (window.planetView) window.planetView.setObstacles([]);
 });
@@ -403,9 +383,6 @@ window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => { if (info.classList.contains('is-revealed')) layout(); }, 120);
 });
-
-// on phones the bio scrolls with the facts: keep the dimming behind it in step
-scroller.addEventListener('scroll', () => canvas.dispatchEvent(new CustomEvent('text-moved')), { passive: true });
 
 window.renderPlanetInfo = (p) => { render(p); if (info.classList.contains('is-active')) { layout(); info.classList.add('is-revealed'); } };
 window.planetCallouts = { rects: () => placedRects.map((r) => Object.assign({}, r)), mode: () => lastLayout, fail: () => lastFail, layout };   // for tests
