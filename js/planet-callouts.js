@@ -135,8 +135,13 @@ const segHitsDisc = (a, b, d, pad) => {
   const t = Math.max(0, Math.min(1, ((d.x - a.x) * vx + (d.y - a.y) * vy) / l2));
   return Math.hypot(a.x + vx * t - d.x, a.y + vy * t - d.y) < d.r + pad;
 };
+// the solar frame's top-left on screen: the close-up is laid out in it (js/solar.js sets --frame-top on about)
+const frameOrigin = () => {
+  const pr = page.getBoundingClientRect();
+  return { left: pr.left, top: pr.top + (parseFloat(page.style.getPropertyValue('--frame-top')) || 0) };
+};
 const pageRect = (node) => {
-  const pr = page.getBoundingClientRect(), r = node.getBoundingClientRect();
+  const pr = frameOrigin(), r = node.getBoundingClientRect();
   return { x: r.left - pr.left, y: r.top - pr.top, w: r.width, h: r.height };
 };
 // the scene captions ("<- towards pluto" / "towards the sun ->") that are showing: callouts keep off them
@@ -144,7 +149,7 @@ const captionRects = () => [...page.querySelectorAll('.page4-pluto, .page4-sun')
 // the right edge of the bio's text, line by line
 function bioRight() {
   let right = 0;
-  const pr = page.getBoundingClientRect();
+  const pr = frameOrigin();
   const walker = document.createTreeWalker(bio, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     if (!n.nodeValue.trim()) continue;

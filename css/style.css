@@ -48,8 +48,8 @@ html {
   html { scroll-behavior: smooth; }
 }
 
-/* hackerfab and about share one background: the solar system canvas (js/solar.js) sits behind both and scrolls with
-   them natively, from the top of hackerfab to the bottom of about */
+/* hackerfab, about and projects share one background: the solar system canvas (js/solar.js) sits behind them and
+   scrolls with them natively, from the top of hackerfab to the bottom of projects */
 .space {
   position: relative;
   overflow-x: clip;             /* a planet button near the right edge must never widen the page */
@@ -235,8 +235,9 @@ html {
   padding: 3vw var(--page-x) max(9vw, calc(var(--edge-gap) + 4.5rem));
 }
 
-/* the solar system: behind hackerfab and about (stars, then orbits and planets; the wafer, logo and text are all in
-   front), as tall as the two sections are. It fades in over the top of hackerfab, under the header */
+/* the solar system: behind hackerfab, about and projects (stars, then orbits and planets; the wafer, logo and text are
+   all in front), as tall as the three sections are. It fades in over the top of hackerfab, under the header, and out to
+   black over its last 15%, before the footer */
 .solar-canvas {
   position: absolute;
   top: 0;
@@ -246,8 +247,8 @@ html {
   z-index: 0;
   display: block;
   image-rendering: pixelated;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 clamp(80px, 12vw, 200px));
-  mask-image: linear-gradient(to bottom, transparent 0, #000 clamp(80px, 12vw, 200px));
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 clamp(80px, 12vw, 200px), #000 85%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 clamp(80px, 12vw, 200px), #000 85%, transparent 100%);
 }
 
 .page4-hint,
@@ -666,6 +667,7 @@ html {
 .planet-canvas {
   position: absolute;
   z-index: 1;
+  translate: 0 var(--frame-top, 0px);   /* drawn in the solar frame's coordinates (js/solar.js sets --frame-top on about) */
   display: block;
   opacity: 0;
   pointer-events: none;
@@ -710,7 +712,8 @@ html {
   --co-scale: 1;
   --co-dim: #a4a7bb;
   position: absolute;
-  inset: 0;
+  inset: var(--frame-top, 0px) 0 auto 0;   /* over the solar frame, which ends at the bottom of about */
+  height: var(--frame-h, 100%);
   z-index: 3;
   pointer-events: none;
   font-family: "Press Start 2P", ui-monospace, monospace;
@@ -876,7 +879,7 @@ html {
     display: block;
     position: absolute;
     z-index: 3;
-    top: var(--info-top, 60vw);
+    top: calc(var(--frame-top, 0px) + var(--info-top, 60vw));
     left: var(--edge-gap);
     right: var(--edge-gap);
     bottom: 0;
