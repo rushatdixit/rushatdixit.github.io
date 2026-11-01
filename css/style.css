@@ -376,14 +376,16 @@ html {
   stroke-linejoin: round;
 }
 
-/* the headline: kept below the wafer at every width (js/brand.js raises --hf-clear when the wafer reaches lower) */
+/* the headline, a normal gap under the logo block: the same size as the section titles ("about", "projects"), with a
+   little more leading since it runs to a few lines, balanced so no line is left a stub */
 .hf-headline {
-  max-width: 92vw;
-  margin: max(24vw, var(--hf-clear, 0px)) 0 0;
+  max-width: max(70vw, 330px);
+  margin: 3.4vw 0 0;
   font-family: var(--font);
   font-weight: 600;
-  font-size: clamp(36px, 7vw, 116px);
-  line-height: 1.02;
+  font-size: var(--title-size);
+  line-height: 1.08;
+  text-wrap: balance;
   letter-spacing: -0.03em;
   color: var(--ink);
 }
@@ -391,9 +393,9 @@ html {
 .hf-body {
   display: flex;
   flex-direction: column;
-  gap: 1.1vw;
-  max-width: max(52vw, 330px);
-  margin-top: 2.6vw;
+  gap: 1.3vw;                  /* spacing and measure as in the about section */
+  max-width: max(46vw, 330px);
+  margin-top: 1.6vw;
   font-size: var(--body-size);
   line-height: 1.5;
   color: var(--ink-2);
