@@ -1,23 +1,32 @@
-// The pictures section: a wall of frames in mixed sizes drifting sideways, like photos hung on a wall.
+// The pictures section: a wall of my photos in mixed sizes drifting sideways, filling the room under the title.
 //
-// To add a photo, give an entry a `src` (e.g. 'images/pictures/trek.jpg') and an `alt`. An entry without a `src` is
-// drawn as an empty outline. `shape` sets the frame's size and proportions (see SHAPES), and the photo is cropped to
-// fill it. Keep photos to ~1600px on the long side and a few hundred KB each.
+// To add a photo: put the original in photos-src/ (git ignores it), run
+//   tools/make-pictures.sh photos-src/IMG_1234.heic some-name
+// and list images/pictures/some-name.avif here with the ratio (width / height) the script prints. The wall gives each
+// photo a frame close to its own shape; a frame can still take `shape` (see SHAPES) to force one.
 const PICTURES = [
-  { shape: 'big',       src: null, alt: '' },
-  { shape: 'portrait',  src: null, alt: '' },
-  { shape: 'small',     src: null, alt: '' },
-  { shape: 'landscape', src: null, alt: '' },
-  { shape: 'square',    src: null, alt: '' },
-  { shape: 'landscape', src: null, alt: '' },
-  { shape: 'portrait',  src: null, alt: '' },
-  { shape: 'small',     src: null, alt: '' },
-  { shape: 'square',    src: null, alt: '' },
-  { shape: 'big',       src: null, alt: '' },
-  { shape: 'landscape', src: null, alt: '' },
-  { shape: 'square',    src: null, alt: '' },
-  { shape: 'portrait',  src: null, alt: '' },
-  { shape: 'small',     src: null, alt: '' },
+  { src: 'images/pictures/valley-stupa-pano.avif',     ratio: 3.02, alt: 'A wide valley with a white stupa, under big clouds' },
+  { src: 'images/pictures/horse-snow-peaks.avif',      ratio: 0.56, alt: 'A horse grazing below snow peaks and a blue sky' },
+  { src: 'images/pictures/jagged-peaks.avif',          ratio: 1.78, alt: 'Jagged grey peaks behind brown hills' },
+  { src: 'images/pictures/gorge-black-white.avif',     ratio: 0.46, alt: 'A gorge and a river in black and white' },
+  { src: 'images/pictures/trail-two-hikers.avif',      ratio: 0.56, alt: 'Two hikers on a dirt road winding into the mountains' },
+  { src: 'images/pictures/hiker-below-ridge.avif',     ratio: 0.48, alt: 'A hiker walking up a stream bed below a huge rock face' },
+  { src: 'images/pictures/gorge-road.avif',            ratio: 1.93, alt: 'A dirt road cut into the side of a gorge' },
+  { src: 'images/pictures/pinnacle-gorge.avif',        ratio: 2.30, alt: 'A rock spire rising between the walls of a gorge' },
+  { src: 'images/pictures/pinnacle-tall.avif',         ratio: 0.42, alt: 'A tall rock pinnacle against stormy clouds' },
+  { src: 'images/pictures/hermitage-cliff.avif',       ratio: 0.79, alt: 'A tiny hermitage on the face of a jagged cliff' },
+  { src: 'images/pictures/hermitage-valley-pano.avif', ratio: 2.14, alt: 'The hermitage cliff and the valley around it' },
+  { src: 'images/pictures/spires-gorge-pano.avif',     ratio: 2.55, alt: 'Rock spires at the end of a dry river bed' },
+  { src: 'images/pictures/cloudy-gorge-pano.avif',     ratio: 2.81, alt: 'A gorge opening up under grey clouds' },
+  { src: 'images/pictures/needle-peak.avif',           ratio: 0.56, alt: 'A needle of rock on top of a grey mountain' },
+  { src: 'images/pictures/needle-peak-ridge.avif',     ratio: 0.56, alt: 'The needle peak above a dark rock ridge' },
+  { src: 'images/pictures/snow-peak.avif',             ratio: 0.56, alt: 'A snow-covered peak above brown hills and a stream' },
+  { src: 'images/pictures/blue-sky-ridge.avif',        ratio: 0.57, alt: 'A furrowed mountainside under a blue sky, a village at its foot' },
+  { src: 'images/pictures/ruins-on-cliff.avif',        ratio: 1.78, alt: 'Ruined walls on top of a fluted cliff' },
+  { src: 'images/pictures/tent-at-night.avif',         ratio: 1.78, alt: 'A tent glowing blue under a starry sky' },
+  { src: 'images/pictures/snowy-range-pano.avif',      ratio: 2.14, alt: 'A snowy mountain range above a boulder field' },
+  { src: 'images/pictures/ram-skull.avif',             ratio: 1.78, alt: 'A ram skull with curled horns on a rock' },
+  { src: 'images/pictures/plains-pano.avif',           ratio: 3.25, alt: 'A wide high plain with mountains on the horizon' },
 ];
 
 (() => {
@@ -25,7 +34,7 @@ const PICTURES = [
   const track = document.querySelector('.pictures-track');
   if (!reel || !track) return;
 
-  // [columns, rows] in grid cells; the wall is ROWS cells tall (css: .pictures-wall)
+  // [columns, rows] in grid cells, for a frame that forces a shape; the wall is --rows cells tall (css: .pictures)
   const SHAPES = {
     big:       [5, 4],
     portrait:  [3, 5],
@@ -53,17 +62,30 @@ const PICTURES = [
     return a;
   }
 
-  function frame(pic) {
+  // A frame for a photo of this ratio: the spans whose shape is within ~15% of it (the photo is cropped to fill the
+  // rest), at a random one of the sizes that fit, so the same shape comes out big in one place and small in another
+  function spans(ratio, cell, gap, rows, rand) {
+    const fits = [];
+    for (let r = 2; r <= Math.min(6, rows); r++) {
+      const h = r * cell + (r - 1) * gap;
+      const c = Math.max(2, Math.round((ratio * h + gap) / (cell + gap)));
+      const err = Math.abs(Math.log((c * cell + (c - 1) * gap) / h / ratio));
+      if (err < 0.15 && c <= 10) fits.push([c, r]);
+    }
+    if (!fits.length) return SHAPES.square;
+    return fits[Math.floor(rand() * fits.length)];
+  }
+
+  function frame(pic, size, rand) {
     const el = document.createElement('div');
     el.className = 'picture';
-    const [c, r] = SHAPES[pic.shape] || SHAPES.square;
+    const [c, r] = pic.shape ? SHAPES[pic.shape] : spans(pic.ratio || 1, size.cell, size.gap, size.rows, rand);
     el.style.gridColumn = `span ${c}`;
     el.style.gridRow = `span ${r}`;
     if (pic.src) {
       const img = document.createElement('img');
       img.src = pic.src;
       img.alt = pic.alt || '';
-      img.loading = 'lazy';
       img.decoding = 'async';
       el.appendChild(img);
     }
@@ -80,15 +102,21 @@ const PICTURES = [
     const gap = parseFloat(cs.getPropertyValue('--gap')) || 12;
     const height = reel.clientHeight;
     if (height > 40) reel.style.setProperty('--cell', `${(height - (rows - 1) * gap) / rows}px`);
+    const size = { cell: parseFloat(getComputedStyle(reel).getPropertyValue('--cell')) || 56, gap, rows };
+
     const wall = document.createElement('div');
     wall.className = 'pictures-wall';
     track.appendChild(wall);
     const rand = rng(7);
     const need = window.innerWidth;
     for (let round = 0; round < 20 && (round === 0 || wall.scrollWidth < need); round++) {
-      for (const pic of shuffled(PICTURES, rand)) wall.appendChild(frame(pic));
+      for (const pic of shuffled(PICTURES, rand)) wall.appendChild(frame(pic, size, rand));
     }
-    track.appendChild(wall.cloneNode(true));
+    // the copy is only there for the loop: screen readers and the keyboard get each photo once
+    const copy = wall.cloneNode(true);
+    copy.setAttribute('aria-hidden', 'true');
+    for (const img of copy.querySelectorAll('img')) img.alt = '';
+    track.appendChild(copy);
     const step = wall.getBoundingClientRect().width + parseFloat(getComputedStyle(wall).marginRight || 0);
     track.style.setProperty('--drift', `${-step}px`);
     track.style.setProperty('--drift-time', `${(step / SPEED).toFixed(1)}s`);
