@@ -959,26 +959,27 @@ main { overflow-x: clip; }
   z-index: 2;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   min-height: calc(100svh - var(--header-h, 80px));
-  padding: 3vw var(--page-x) 5vw;
-  --rows: 8;
-  --cell: clamp(16px, min(5.4svh, 6.5vw), 56px);    /* one grid cell; the frames span several (js/pictures.js) */
+  padding: 3vw var(--page-x) clamp(16px, 2.5vw, 40px);
   --gap: clamp(8px, 1.1svh, 14px);
 }
 
 .pictures .section-title { align-self: flex-start; margin-bottom: clamp(20px, 3vw, 48px); }
 
+/* all the room under the title: the wall is built exactly this tall (js/pictures.js reads it) */
 .pictures-reel {
+  flex: 1 1 0;
+  min-height: 240px;
   margin: 0 calc(-1 * var(--page-x));   /* edge to edge */
   overflow: hidden;
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
-  mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
 }
 
 .pictures-track {
   display: flex;
   width: max-content;
+  height: 100%;
   animation: pictures-drift var(--drift-time, 60s) linear infinite;
 }
 
@@ -988,16 +989,24 @@ main { overflow-x: clip; }
   to { transform: translateX(var(--drift, -50%)); }
 }
 
+/* columns of frames, each column exactly the wall's height (js/pictures.js sizes every frame) */
 .pictures-wall {
-  display: grid;
-  grid-template-rows: repeat(var(--rows), var(--cell));
-  grid-auto-columns: var(--cell);
-  grid-auto-flow: column dense;          /* column by column, back-filling holes: the irregular wall */
+  display: flex;
   gap: var(--gap);
   margin-right: var(--gap);              /* the same gap at the seam between the wall and its copy */
+  height: 100%;
+}
+
+.pictures-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  flex: none;
 }
 
 .picture {
+  flex: none;
+  box-sizing: border-box;
   border: 2px solid var(--ink-3);
   border-radius: 3px;
   overflow: hidden;
