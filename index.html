@@ -12,19 +12,20 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/gochi-hand/400.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/press-start-2p/400.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css">
-  <link rel="stylesheet" href="css/style.css?v=108">
-  <script src="js/brand.js?v=108" defer></script>
-  <script src="js/scroll.js?v=108" defer></script>
-  <script src="js/callout.js?v=108" defer></script>
-  <script src="js/backgrounds.js?v=108" defer></script>
-  <script src="js/bodies.js?v=108" defer></script>
-  <script src="js/solar.js?v=108" defer></script>
-  <script src="js/planet-view.js?v=108" defer></script>
-  <script src="js/planet-callouts.js?v=108" defer></script>
-  <script src="js/furnace.js?v=108" defer></script>
+  <link rel="stylesheet" href="css/style.css?v=109">
+  <script src="js/brand.js?v=109" defer></script>
+  <script src="js/scroll.js?v=109" defer></script>
+  <script src="js/callout.js?v=109" defer></script>
+  <script src="js/backgrounds.js?v=109" defer></script>
+  <script src="js/bodies.js?v=109" defer></script>
+  <script src="js/solar.js?v=109" defer></script>
+  <script src="js/planet-view.js?v=109" defer></script>
+  <script src="js/planet-callouts.js?v=109" defer></script>
+  <script src="js/furnace.js?v=109" defer></script>
+  <script src="js/pictures.js?v=109" defer></script>
   <!-- KaTeX comes from a CDN, so it goes last but one: a slow CDN must not hold up anything above. field.js uses it -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js" defer></script>
-  <script src="js/field.js?v=108" defer></script>
+  <script src="js/field.js?v=109" defer></script>
 </head>
 <body>
   <!-- the electric field of the charges in the first screen (js/field.js): the bottom-most layer of the page -->
@@ -66,6 +67,7 @@
         <a href="#hackerfab">hackerfab</a>
         <a href="#about">about</a>
         <a href="#projects">projects</a>
+        <a href="#pictures">pictures</a>
         <a href="#contact">contact</a>
       </nav>
     </header>
@@ -123,7 +125,7 @@
         </li>
         <li class="project">
           <div class="project-text">
-            <div class="project-head"><a class="project-name" href="https://github.com/rushatdixit/electrostatics_but_interactable" target="_blank" rel="noopener noreferrer">electrostatics simulator</a></div>
+            <div class="project-head"><a class="project-name" href="https://x.com/rushat_dixit/status/2115070409762881767" target="_blank" rel="noopener noreferrer">humidity-controlled chamber</a></div>
           </div>
         </li>
       </ul>
@@ -141,7 +143,16 @@
       </div>
     </section>
     </div>
-    <div class="sky-fade" aria-hidden="true"></div>
+    <!-- the black of projects fading into the say-hi sky; the pictures section sits on its black part -->
+    <div class="sky-fade">
+      <section class="pictures" id="pictures">
+        <h2 class="section-title">pictures</h2>
+        <!-- a collage of frames drifting sideways, built by js/pictures.js (the photos are listed at the top of that file) -->
+        <div class="pictures-reel" aria-hidden="true">
+          <div class="pictures-track"></div>
+        </div>
+      </section>
+    </div>
     <footer class="site-footer" id="contact">
       <img class="footer-photo" src="images/say-hi-tent.jpg" alt="A tent lit blue from inside, under a starry sky in a mountain valley" width="2000" height="1125" loading="lazy" decoding="async">
       <h2 class="section-title">say hi</h2>
