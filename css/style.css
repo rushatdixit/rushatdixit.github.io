@@ -961,6 +961,8 @@ main { overflow-x: clip; }
   flex-direction: column;
   min-height: calc(100svh - var(--header-h, 80px));
   padding: 3vw var(--page-x) clamp(16px, 2.5vw, 40px);
+  --rows: 8;
+  --cell: clamp(16px, min(5.4svh, 6.5vw), 56px);   /* one grid cell; js/pictures.js sizes it so the rows fill the reel */
   --gap: clamp(8px, 1.1svh, 14px);
 }
 
@@ -989,24 +991,16 @@ main { overflow-x: clip; }
   to { transform: translateX(var(--drift, -50%)); }
 }
 
-/* columns of frames, each column exactly the wall's height (js/pictures.js sizes every frame) */
 .pictures-wall {
-  display: flex;
-  align-items: flex-start;               /* each column sets its own height and offset (js/pictures.js) */
-  margin-right: var(--gap);              /* the gap at the seam between the wall and its copy */
-  height: 100%;
-}
-
-.pictures-col {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;        /* a column's spare height goes between its frames */
+  display: grid;
+  grid-template-rows: repeat(var(--rows), var(--cell));
+  grid-auto-columns: var(--cell);
+  grid-auto-flow: column dense;          /* column by column, back-filling holes: the irregular wall */
   gap: var(--gap);
-  flex: none;
+  margin-right: var(--gap);              /* the same gap at the seam between the wall and its copy */
 }
 
 .picture {
-  flex: none;
   box-sizing: border-box;
   border: 2px solid var(--ink-3);
   border-radius: 3px;
