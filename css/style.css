@@ -967,24 +967,29 @@ main { overflow-x: clip; }
   padding: 3vw var(--page-x) clamp(16px, 2.5vw, 40px);
 }
 
-/* below the heading: room for the Kanthal wire (js/pictures-wire.js) to leave its coil, beside the heading, and pass
-   between the coil and the first photo with its clearance on both sides */
-.pictures .section-title {
-  align-self: flex-start;
-  margin-bottom: max(clamp(20px, 3vw, 48px), calc(2 * max(16px, 1.5vw) + 26px));
+/* Room for the coil of Kanthal (js/pictures-wire.js) to travel: it rolls down the section, round the photos, laying its
+   wire behind it. --coil-gap fits the coil (a 3.2vw roll) through with clearance above and below: under the heading and
+   between photos. --lane is the room it needs beside a photo: the titles stop short of the window's edge by that much */
+.pictures {
+  --coil-gap: max(clamp(48px, 7vw, 120px), calc(4.4vw + 2 * max(16px, 1.5vw) + 34px));
+  --lane: calc(6.2vw + 2 * max(16px, 1.5vw) + 20px);
 }
 
-/* the photos one after another down the section, hanging left and right in turn (js/featured.js). On wider screens a
-   little padding at each side keeps a lane, between the photos (or titles) and the window's edge, for the wire */
+.pictures .section-title {
+  align-self: flex-start;
+  margin-bottom: var(--coil-gap);
+}
+
+/* the photos one after another down the section, hanging left and right in turn (js/featured.js) */
 .pictures-featured {
   display: flex;
   flex-direction: column;
-  gap: clamp(48px, 7vw, 120px);
+  gap: var(--coil-gap);
   padding-inline: max(0px, calc(2 * max(16px, 1.5vw) + 18px - var(--page-x)));
 }
 
 @media (max-width: 699px) {
-  .pictures .section-title { margin-bottom: 36px; }
+  .pictures { --coil-gap: 76px; }
   .pictures-featured { padding-inline: 0; }
 }
 
@@ -1011,10 +1016,9 @@ main { overflow-x: clip; }
 .pw-face { fill: #33363c; }
 .pw-hub { fill: #141619; stroke: rgb(125, 130, 140); stroke-opacity: 0.7; }
 .pw-spokes { stroke: #a2a8b1; stroke-opacity: 0.85; }
-.pw-tip { fill: #eef1f5; fill-opacity: 0.55; }
-.pw-cap { stroke: rgb(165, 170, 180); stroke-linecap: butt; }
 .pw-debug rect { fill: rgba(255, 70, 70, 0.1); stroke: rgba(255, 70, 70, 0.6); stroke-width: 1; }
 .pw-debug polyline { fill: none; stroke: #2fe0ff; stroke-width: 1.5; }
+.pw-debug circle { fill: #ffd84a; }
 
 /* a photo and its title beside it, at the photo's bottom edge: photo on the left, or on the right (--right) */
 .featured {
@@ -1050,18 +1054,25 @@ main { overflow-x: clip; }
   font-size: clamp(18px, 1.9vw, 28px);
   line-height: 1.3;
   color: var(--ink);
+  /* the open side keeps a lane for the coil between the title and the window's edge */
+  max-width: max(120px, calc(100% - var(--w, 62%) - clamp(16px, 2vw, 32px) - var(--lane)));
 }
 
-/* phones: full width, the title under the photo */
-@media (max-width: 700px) {
-  .featured,
-  .featured--right {
+/* phones: the photos a little narrower than the screen, hanging left and right in turn, each with its title under it,
+   so the coil has a lane beside every photo too (--wp from js/featured.js) */
+@media (max-width: 699px) {
+  .featured {
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
     gap: 10px;
     text-align: left;
   }
-  .featured-frame { width: 100%; }
+  .featured--right {
+    align-items: flex-end;
+    text-align: right;
+  }
+  .featured-frame,
+  .featured figcaption { width: var(--wp, 78%); max-width: none; }
 }
 
 /* ---- the drifting wall (js/pictures.js): in the footer, its middle where the mountain starts in the say-hi photo.

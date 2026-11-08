@@ -35,7 +35,10 @@ const FEATURED = [
   shown.forEach((pic, i) => {
     const fig = document.createElement('figure');
     fig.className = `featured ${right(i) ? 'featured--right' : 'featured--left'}`;
-    fig.style.setProperty('--w', `${62 + Math.random() * 12}%`);   // share of the section's width
+    const wf = 56 + Math.random() * 10;                            // share of the section's width (wider screens) ...
+    fig.style.setProperty('--w', `${wf}%`);
+    fig.style.setProperty('--wf', String(wf / 100));
+    fig.style.setProperty('--wp', `${74 + Math.random() * 6}%`);   // ... and of a phone's (the photo hangs to one side)
     fig.style.setProperty('--ratio', String(pic.ratio));
     const frame = document.createElement('div');
     frame.className = 'featured-frame';
