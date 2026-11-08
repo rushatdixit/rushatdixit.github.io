@@ -8,7 +8,7 @@
 // in the place of one of the `swap` photos, picked at random.
 const FEATURED = [
   { src: 'images/featured/mountain-valley.avif',  ratio: 1.33, title: 'out on a trek',                      alt: 'A sunny mountain valley with snow peaks on the horizon' },
-  { src: 'images/featured/furnace-team.avif',     ratio: 1.78, title: 'with the tube furnace we built',     alt: 'Two of us posing beside the tube furnace in the workshop', swap: true },
+  { src: 'images/featured/furnace-team.avif',     ratio: 1.78, title: 'me and abhineet with the furnace we built', alt: 'Abhineet and me posing beside the tube furnace in the workshop', swap: true },
   { src: 'images/featured/furnace-bench.avif',    ratio: 1.78, title: 'the tube furnace, holding 1100 °C',  alt: 'The tube furnace on its steel bench, glowing orange inside' },
   { src: 'images/featured/india-foss-talk.avif',  ratio: 1.83, title: 'speaking at India FOSS 2026',        alt: 'Giving a talk at India FOSS 2026, pointing at a slide titled Why?', swap: true },
   { src: 'images/featured/humidity-chamber.avif', ratio: 1.78, title: 'the humidity-controlled chamber',    alt: 'The humidity-controlled chamber on a lab bench, wired to a power supply and a laptop', swapIn: true },

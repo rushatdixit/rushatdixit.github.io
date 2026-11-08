@@ -945,10 +945,14 @@ main { overflow-x: clip; }
   .site-footer { --sky-x: 91%; }                /* the tent stays in view */
 }
 
+/* Black behind the pictures section, then the fade to the sky over its last 140svh, however tall the section grows.
+   The padding is the room under the photos where the drifting wall's top reaches up (.pictures-reel): padding, not a
+   margin on .pictures, which would slip out of this box and leave a band of bare page between it and the footer */
 .sky-fade {
-  min-height: 140svh;           /* the pictures section sits in its top part, on the black */
+  min-height: 140svh;
+  padding-bottom: 48svh;
   background:
-    linear-gradient(to bottom, rgba(0,0,0,1.000) 0.0%, rgba(0,0,0,0.980) 8.3%, rgba(0,0,0,0.926) 16.7%, rgba(0,0,0,0.844) 25.0%, rgba(0,0,0,0.741) 33.3%, rgba(0,0,0,0.624) 41.7%, rgba(0,0,0,0.500) 50.0%, rgba(0,0,0,0.376) 58.3%, rgba(0,0,0,0.259) 66.7%, rgba(0,0,0,0.156) 75.0%, rgba(0,0,0,0.074) 83.3%, rgba(0,0,0,0.020) 91.7%, rgba(0,0,0,0.000) 100.0%),
+    linear-gradient(to bottom, rgba(0,0,0,1.000) calc(100% - 140svh), rgba(0,0,0,0.980) calc(100% - 128.38svh), rgba(0,0,0,0.926) calc(100% - 116.62svh), rgba(0,0,0,0.844) calc(100% - 105svh), rgba(0,0,0,0.741) calc(100% - 93.38svh), rgba(0,0,0,0.624) calc(100% - 81.62svh), rgba(0,0,0,0.500) calc(100% - 70svh), rgba(0,0,0,0.376) calc(100% - 58.38svh), rgba(0,0,0,0.259) calc(100% - 46.62svh), rgba(0,0,0,0.156) calc(100% - 35svh), rgba(0,0,0,0.074) calc(100% - 23.38svh), rgba(0,0,0,0.020) calc(100% - 11.62svh), rgba(0,0,0,0.000) 100%),
     var(--sky) var(--sky-x) 0 / var(--sky-w) 100% no-repeat;
 }
 
@@ -961,7 +965,6 @@ main { overflow-x: clip; }
   flex-direction: column;
   min-height: calc(100svh - var(--header-h, 80px));
   padding: 3vw var(--page-x) clamp(16px, 2.5vw, 40px);
-  margin-bottom: 48svh;           /* the fade to the sky, where the top of the drifting wall reaches up (.pictures-reel) */
 }
 
 .pictures .section-title { align-self: flex-start; margin-bottom: clamp(20px, 3vw, 48px); }
