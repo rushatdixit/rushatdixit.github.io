@@ -60,6 +60,7 @@ const PICTURES = [
   { src: 'images/pictures/plasma-sputter.avif',        ratio: 0.56, alt: 'Purple plasma glowing through a sputtering chamber window' },
   { src: 'images/pictures/sputter-chamber.avif',       ratio: 0.56, alt: 'The top of the sputtering system, plasma glowing in its viewport' },
   { src: 'images/pictures/furnace-bench.avif',         ratio: 1.78, alt: 'The furnace bench with its gas cylinder and controllers' },
+  { src: 'images/pictures/furnace-glow.avif',          ratio: 1.78, alt: 'Looking into the glowing tube furnace with a friend' },
 
   // around the lab, sem 3
   { src: 'images/pictures/furnace-wiring.avif',        ratio: 0.56, alt: 'The tangle of wiring inside the furnace controller box' },
