@@ -985,7 +985,6 @@ main { overflow-x: clip; }
   animation: pictures-drift var(--drift-time, 60s) linear infinite;
 }
 
-.pictures-reel:hover .pictures-track { animation-play-state: paused; }
 
 @keyframes pictures-drift {
   to { transform: translateX(var(--drift, -50%)); }
