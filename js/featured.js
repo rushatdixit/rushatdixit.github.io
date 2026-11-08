@@ -1,6 +1,6 @@
 // The pictures section's still photos, each with its title underneath, laid out as a collage that is different on
-// every visit: which photos, the pattern, and where each frame hangs in its spot are all random. A frame is always the
-// photo's own shape, and the collage is picked to fill as much of the room under the title as it can.
+// every visit: which photos and the pattern are random. The frames come out close to one size, with small gaps, each
+// in its photo's own shape, and the collage is picked to fill as much of the room under the title as it can.
 //
 // To change one: make the web copy with
 //   OUT=images/featured tools/make-pictures.sh photos-src/pictures/IMG_1234.heic some-name
@@ -85,15 +85,23 @@ const FEATURED = [
     const H = box.clientHeight;
     if (W < 40 || H < 40) return;
     const cs = getComputedStyle(figures[0].cap);
-    const capH = parseFloat(cs.marginTop) + (parseFloat(cs.lineHeight) || 20) * 2;   // two lines for a long title
-    const gap = Math.min(32, Math.max(14, W * 0.02));
+    const capH = parseFloat(cs.marginTop) + (parseFloat(cs.lineHeight) || 20);   // one line of title (css keeps it to one)
+    const gap = Math.min(18, Math.max(10, W * 0.012));
 
     // a cell holds its frame and its title, so it is a little taller than the photo: allow for that at about the size
     // the frames will come out
     const hEst = H / 2;
     const leafRatio = figures.map(({ pic }) => (pic.ratio * hEst) / (hEst + capH));
 
-    // many random collages; keep one at random from those that fill nearly as much as the best
+    // the frame a photo gets in a cell: as big as the cell allows less the gap and its title, in the photo's own shape
+    const fit = (c, ratio) => {
+      const fw = Math.max(0, Math.min(c.w - gap, (c.h - gap - capH) * ratio));
+      return { fw, fh: fw / ratio };
+    };
+
+    // Many random collages, each scored by how much of the room its frames cover, times how alike their sizes are
+    // (smallest frame over biggest, squared): a collage with one big photo and three thumbnails scores low. One is kept
+    // at random from those scoring nearly as well as the best
     const rand = rng(seed);
     const tries = [];
     const idx = figures.map((_, i) => i);
@@ -106,14 +114,17 @@ const FEATURED = [
       const R = ratioOf(tree, leafRatio);
       const w = R > W / H ? W : H * R;
       const h = R > W / H ? W / R : H;
-      tries.push({ tree, w, h, area: w * h });
+      const spots = [];
+      cells(tree, leafRatio, 0, 0, w, h, spots);
+      const areas = spots.map((c, i) => { const { fw, fh } = fit(c, figures[i].pic.ratio); return fw * fh; });
+      const alike = Math.min(...areas) / Math.max(...areas);
+      tries.push({ tree, w, h, score: (areas.reduce((s, a) => s + a, 0) / (W * H)) * alike * alike });
     }
-    // Many orders give the same pattern (a plain 2×2 comes up again and again), so the good ones are grouped by pattern
-    // and a pattern is picked first: a big photo beside a stack of three is as likely as the grid
-    const best = Math.max(...tries.map((t) => t.area));
+    // Many orders give the same pattern, so the good ones are grouped by pattern and a pattern is picked first
+    const best = Math.max(...tries.map((t) => t.score));
     const shape = (n) => (n.leaf !== undefined ? 'o' : `${n.dir}(${shape(n.a)},${shape(n.b)})`);
     const patterns = new Map();
-    for (const t of tries.filter((tr) => tr.area >= best * 0.9)) {
+    for (const t of tries.filter((tr) => tr.score >= best * 0.9)) {
       const key = shape(t.tree);
       if (!patterns.has(key)) patterns.set(key, []);
       patterns.get(key).push(t);
@@ -123,19 +134,16 @@ const FEATURED = [
     const group = groups[Math.floor(pick() * groups.length)];
     const { tree, w, h } = group[Math.floor(pick() * group.length)];
 
+    // the collage sits in the middle of the room
     const spots = [];
-    cells(tree, leafRatio, (W - w) * pick(), (H - h) * pick(), w, h, spots);
+    cells(tree, leafRatio, (W - w) / 2, (H - h) / 2, w, h, spots);
 
-    // each frame hangs in its cell: 90–100% of the room, at a random spot, its title right under it
+    // each frame fills its cell, centred in what little room is left over, its title right under it
     spots.forEach((c, i) => {
       const { pic, fig, frame, cap } = figures[i];
-      const cw = c.w - gap;
-      const roomH = c.h - gap - capH;
-      let fw = Math.min(cw, roomH * pic.ratio);
-      fw *= 0.9 + pick() * 0.1;
-      const fh = fw / pic.ratio;
-      fig.style.left = `${c.x + gap / 2 + pick() * (cw - fw)}px`;
-      fig.style.top = `${c.y + gap / 2 + pick() * (roomH - fh)}px`;
+      const { fw, fh } = fit(c, pic.ratio);
+      fig.style.left = `${c.x + (c.w - fw) / 2}px`;
+      fig.style.top = `${c.y + gap / 2 + (c.h - gap - capH - fh) / 2}px`;
       frame.style.width = `${fw}px`;
       frame.style.height = `${fh}px`;
       cap.style.width = `${fw}px`;
