@@ -27,6 +27,53 @@ const PICTURES = [
   { src: 'images/pictures/snowy-range-pano.avif',      ratio: 2.14, alt: 'A snowy mountain range above a boulder field' },
   { src: 'images/pictures/ram-skull.avif',             ratio: 1.78, alt: 'A ram skull with curled horns on a rock' },
   { src: 'images/pictures/plains-pano.avif',           ratio: 3.25, alt: 'A wide high plain with mountains on the horizon' },
+
+  // SEMICON India 2026
+  { src: 'images/pictures/mirror-selfie.avif',         ratio: 0.56, alt: 'A mirror selfie in a hotel corridor' },
+  { src: 'images/pictures/hackerfab-booth.avif',       ratio: 1.78, alt: 'Three of us smiling in front of the HackerFab IITB screen' },
+  { src: 'images/pictures/pcb-inspection.avif',        ratio: 1.78, alt: 'A circuit board magnified on monitors at an inspection booth' },
+  { src: 'images/pictures/glass-ingot.avif',           ratio: 0.56, alt: 'A tall dark crystal ingot on display at a booth' },
+  { src: 'images/pictures/semicon-sign.avif',          ratio: 0.56, alt: 'Three of us standing on the big SEMICON India letters' },
+  { src: 'images/pictures/semicon-selfie.avif',        ratio: 1.78, alt: 'A selfie with friends in front of the SEMICON India 2026 backdrop' },
+  { src: 'images/pictures/conference-swag.avif',       ratio: 1.78, alt: 'Conference bags, pens and brochures spread out on a bed' },
+  { src: 'images/pictures/semicon-welcome.avif',       ratio: 1.78, alt: 'Standing at the Welcome to SEMICON India 2026 board' },
+  { src: 'images/pictures/fab-tools.avif',             ratio: 1.78, alt: 'Giving a thumbs up between big white fab tools' },
+  { src: 'images/pictures/hotel-room.avif',            ratio: 1.78, alt: 'A friend standing in a hotel room full of bags' },
+  { src: 'images/pictures/dinner.avif',                ratio: 1.78, alt: 'Friends at dinner in a warmly lit restaurant' },
+  { src: 'images/pictures/leather-jacket.avif',        ratio: 0.56, alt: 'Standing in a brown leather jacket against a patterned wall' },
+  { src: 'images/pictures/airport-food.avif',          ratio: 1.78, alt: 'Two of us eating at an airport food court' },
+  { src: 'images/pictures/bus-selfie.avif',            ratio: 1.78, alt: 'A cramped, grinning selfie with friends and backpacks' },
+  { src: 'images/pictures/exhibition-halls.avif',      ratio: 1.33, alt: 'Our group sitting outside the SEMICON India exhibition halls' },
+  { src: 'images/pictures/plush-bunny.avif',           ratio: 0.75, alt: 'Two of us holding a purple plush bunny' },
+  { src: 'images/pictures/cafe-table.avif',            ratio: 1.33, alt: 'Our group around a cafe table in the exhibition hall' },
+  { src: 'images/pictures/semicon-group.avif',         ratio: 1.96, alt: 'Our group lined up beside the SEMICON India Transform Tomorrow sign' },
+  { src: 'images/pictures/semicon-group-selfie.avif',  ratio: 1.81, alt: 'A group selfie with conference badges' },
+
+  // wafers, the sputtering system and the tube furnace
+  { src: 'images/pictures/wafer-black.avif',           ratio: 1.78, alt: 'A dark wafer piece on a wooden bench' },
+  { src: 'images/pictures/wafer-box.avif',             ratio: 0.56, alt: 'A wafer in a clear plastic box' },
+  { src: 'images/pictures/wafer-gold.avif',            ratio: 1.78, alt: 'A gold-coloured wafer piece on blue cloth' },
+  { src: 'images/pictures/wafer-maroon.avif',          ratio: 0.56, alt: 'A maroon wafer piece held in tweezers' },
+  { src: 'images/pictures/wafer-blue.avif',            ratio: 0.56, alt: 'A shimmering blue wafer triangle held in tweezers' },
+  { src: 'images/pictures/wafer-violet.avif',          ratio: 0.56, alt: 'A violet wafer triangle held over a black wafer' },
+  { src: 'images/pictures/plasma-sputter.avif',        ratio: 0.56, alt: 'Purple plasma glowing through a sputtering chamber window' },
+  { src: 'images/pictures/sputter-chamber.avif',       ratio: 0.56, alt: 'The top of the sputtering system, plasma glowing in its viewport' },
+  { src: 'images/pictures/furnace-front.avif',         ratio: 1.78, alt: 'The tube furnace on a steel bench, glowing orange inside' },
+  { src: 'images/pictures/furnace-bench.avif',         ratio: 1.78, alt: 'The furnace bench with its gas cylinder and controllers' },
+  { src: 'images/pictures/furnace-glow.avif',          ratio: 1.78, alt: 'Looking into the glowing tube furnace with a friend' },
+
+  // around the lab, sem 3
+  { src: 'images/pictures/furnace-wiring.avif',        ratio: 0.56, alt: 'The tangle of wiring inside the furnace controller box' },
+  { src: 'images/pictures/quartz-tube.avif',           ratio: 1.78, alt: 'Holding up the long quartz tube for the furnace' },
+  { src: 'images/pictures/lab-bench.avif',             ratio: 1.78, alt: 'A power supply, function generator and two multimeters on a lab bench' },
+  { src: 'images/pictures/scope-generator.avif',       ratio: 1.78, alt: 'An oscilloscope and a function generator wired up' },
+  { src: 'images/pictures/purple-room.avif',           ratio: 1.78, alt: 'A room lit purple by LED strips, a laptop on the desk' },
+  { src: 'images/pictures/towers.avif',                ratio: 0.56, alt: 'Two tall residential towers against a blue sky' },
+  { src: 'images/pictures/scope-square.avif',          ratio: 1.78, alt: 'A square wave on an oscilloscope screen' },
+  { src: 'images/pictures/breadboard-meter.avif',      ratio: 1.78, alt: 'A breadboard circuit with a multimeter reading' },
+  { src: 'images/pictures/scope-sawtooth.avif',        ratio: 1.78, alt: 'Charging curves and a square wave on an oscilloscope' },
+  { src: 'images/pictures/night-walk.avif',            ratio: 0.56, alt: 'Standing on a campus road at night under a streetlight' },
+  { src: 'images/pictures/arduino-buzzer.avif',        ratio: 1.78, alt: 'An Arduino wired to a buzzer on a breadboard' },
 ];
 
 (() => {
@@ -76,7 +123,9 @@ const PICTURES = [
     return fits[Math.floor(rand() * fits.length)];
   }
 
-  function frame(pic, size, rand) {
+  const EAGER = 14;   // the first photos on the wall load straight away; the rest as they drift towards the window
+
+  function frame(pic, size, rand, eager) {
     const el = document.createElement('div');
     el.className = 'picture';
     const [c, r] = pic.shape ? SHAPES[pic.shape] : spans(pic.ratio || 1, size.cell, size.gap, size.rows, rand);
@@ -87,6 +136,7 @@ const PICTURES = [
       img.src = pic.src;
       img.alt = pic.alt || '';
       img.decoding = 'async';
+      if (!eager) img.loading = 'lazy';
       el.appendChild(img);
     }
     return el;
@@ -110,7 +160,7 @@ const PICTURES = [
     const rand = rng(7);
     const need = window.innerWidth;
     for (let round = 0; round < 20 && (round === 0 || wall.scrollWidth < need); round++) {
-      for (const pic of shuffled(PICTURES, rand)) wall.appendChild(frame(pic, size, rand));
+      for (const pic of shuffled(PICTURES, rand)) wall.appendChild(frame(pic, size, rand, wall.children.length < EAGER));
     }
     // the copy is only there for the loop: screen readers and the keyboard get each photo once
     const copy = wall.cloneNode(true);
