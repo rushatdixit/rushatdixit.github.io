@@ -1236,6 +1236,7 @@ function measureText() {
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       if (!n.nodeValue.trim() || n.parentElement.closest('canvas, script, style')) continue;
       if (n.parentElement.closest('.planet-info')) continue;              // the callouts carry their own pixel outline: no dimming
+      if (n.parentElement.closest('.furnace')) continue;                  // the furnace's meter units sit on their own dark cases
       if (n.parentElement.closest('[hidden]') || getComputedStyle(n.parentElement).visibility === 'hidden') continue;
       const range = document.createRange();
       range.selectNodeContents(n);

@@ -12,18 +12,19 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/gochi-hand/400.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/press-start-2p/400.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css">
-  <link rel="stylesheet" href="css/style.css?v=97">
-  <script src="js/brand.js?v=97" defer></script>
-  <script src="js/scroll.js?v=97" defer></script>
-  <script src="js/callout.js?v=97" defer></script>
-  <script src="js/backgrounds.js?v=97" defer></script>
-  <script src="js/bodies.js?v=97" defer></script>
-  <script src="js/solar.js?v=97" defer></script>
-  <script src="js/planet-view.js?v=97" defer></script>
-  <script src="js/planet-callouts.js?v=97" defer></script>
+  <link rel="stylesheet" href="css/style.css?v=108">
+  <script src="js/brand.js?v=108" defer></script>
+  <script src="js/scroll.js?v=108" defer></script>
+  <script src="js/callout.js?v=108" defer></script>
+  <script src="js/backgrounds.js?v=108" defer></script>
+  <script src="js/bodies.js?v=108" defer></script>
+  <script src="js/solar.js?v=108" defer></script>
+  <script src="js/planet-view.js?v=108" defer></script>
+  <script src="js/planet-callouts.js?v=108" defer></script>
+  <script src="js/furnace.js?v=108" defer></script>
   <!-- KaTeX comes from a CDN, so it goes last but one: a slow CDN must not hold up anything above. field.js uses it -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js" defer></script>
-  <script src="js/field.js?v=97" defer></script>
+  <script src="js/field.js?v=108" defer></script>
 </head>
 <body>
   <!-- the electric field of the charges in the first screen (js/field.js): the bottom-most layer of the page -->
@@ -43,14 +44,14 @@
   <main id="top">
     <section class="hero">
       <h1 class="name">Rushat Dixit</h1>
-      <div class="field-slot" aria-hidden="true"></div>   <!-- phones: the room for the charges between the name and the photo -->
+      <p class="hero-tagline">2<sup>nd</sup> year, BTech MEMS Dept. @ <span class="blue">IIT Bombay</span><svg class="tagline-squiggle" viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path d="M2,6 Q7.1,2.3 12.2,5.9 Q17.2,9.7 22.2,5.9 Q28.3,1.4 34.4,6.3 Q39.5,10.2 44.6,5.7 Q49.6,2.3 54.6,5.7 Q60.8,10.6 66.9,6.4 Q72.8,2.2 78.8,5.8 Q84.5,10.5 90.2,6.4 Q96.2,2.3 102.3,6.1 Q108.1,10.2 113.8,5.6 Q119.3,2.3 124.8,6.5 Q130.8,10.3 136.8,5.8 Q143.0,1.7 149.1,6.5 Q155.1,10.2 161.1,5.9 Q166.8,1.9 172.4,5.6 Q177.6,10.6 182.8,5.5 Q187.7,1.6 192.5,5.7 Q198.0,10.2 203.6,5.8 Q209.8,2.2 216.1,5.9 Q221.1,10.4 226.2,5.7 Q231.5,1.5 236.7,5.8 Q242.3,10.7 247.9,5.5 Q252.8,2.1 257.6,6.3 Q263.3,9.9 268.9,5.8 Q274.0,1.8 279.0,5.5 Q284.8,10.7 290.6,6.5 Q294.3,1.2 298.0,5.4"/></svg></p>
       <img class="portrait" src="images/me.jpg" alt="Portrait of me" width="440" height="666">
+      <div class="field-slot" aria-hidden="true"></div>   <!-- phones: the room for the charges under the photo -->
       <svg class="callout" aria-hidden="true">
         <path class="callout-line"/>
         <path class="callout-head"/>
       </svg>
       <span class="callout-text" aria-hidden="true">this is him!</span>
-      <p class="hero-tagline">2<sup>nd</sup> year, BTech MEMS Dept. @ <span class="blue">IIT Bombay</span><svg class="tagline-squiggle" viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path d="M2,6 Q7.1,2.3 12.2,5.9 Q17.2,9.7 22.2,5.9 Q28.3,1.4 34.4,6.3 Q39.5,10.2 44.6,5.7 Q49.6,2.3 54.6,5.7 Q60.8,10.6 66.9,6.4 Q72.8,2.2 78.8,5.8 Q84.5,10.5 90.2,6.4 Q96.2,2.3 102.3,6.1 Q108.1,10.2 113.8,5.6 Q119.3,2.3 124.8,6.5 Q130.8,10.3 136.8,5.8 Q143.0,1.7 149.1,6.5 Q155.1,10.2 161.1,5.9 Q166.8,1.9 172.4,5.6 Q177.6,10.6 182.8,5.5 Q187.7,1.6 192.5,5.7 Q198.0,10.2 203.6,5.8 Q209.8,2.2 216.1,5.9 Q221.1,10.4 226.2,5.7 Q231.5,1.5 236.7,5.8 Q242.3,10.7 247.9,5.5 Q252.8,2.1 257.6,6.3 Q263.3,9.9 268.9,5.8 Q274.0,1.8 279.0,5.5 Q284.8,10.7 290.6,6.5 Q294.3,1.2 298.0,5.4"/></svg></p>
       <a class="scroll-cue" href="#hackerfab">
         <span class="scroll-cue-text">to learn more..</span>
         <svg viewBox="0 0 60 132" aria-hidden="true">
@@ -108,6 +109,7 @@
       <p class="projects-intro">i love <span class="navy">building</span>. here are some things i’ve built:</p>
       <!-- each row can also take, when there is one: <img class="project-photo" src="…" alt="…">,
            <span class="project-year">2025</span> after the name, and <p class="project-desc">one sentence</p> -->
+      <div class="projects-body">
       <ul class="project-list">
         <li class="project">
           <div class="project-text">
@@ -125,9 +127,23 @@
           </div>
         </li>
       </ul>
+      <!-- the tube furnace, drawn and animated by js/furnace.js. Its link repeats the list's first link, so it is skipped by
+           the keyboard and screen readers; the figure itself is one image with a text alternative -->
+      <figure class="furnace" role="img" aria-label="Animated drawing of my tube furnace, a coiled heating element around a quartz tube, holding 1100 °C">
+        <a class="furnace-link" href="https://docs.hackerfabiitb.org/tube-furnace" target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true"></a>
+        <svg class="furnace-defs" width="0" height="0" aria-hidden="true" focusable="false">
+          <filter id="furnace-refract" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+            <feImage result="map" preserveAspectRatio="none"/>
+            <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="G" scale="0"/>
+          </filter>
+        </svg>
+      </figure>
+      </div>
     </section>
     </div>
+    <div class="sky-fade" aria-hidden="true"></div>
     <footer class="site-footer" id="contact">
+      <img class="footer-photo" src="images/say-hi-tent.jpg" alt="A tent lit blue from inside, under a starry sky in a mountain valley" width="2000" height="1125" loading="lazy" decoding="async">
       <h2 class="section-title">say hi</h2>
       <!-- your email goes here: <a class="footer-email" href="mailto:…">…</a> -->
       <p class="footer-links">

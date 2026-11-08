@@ -115,7 +115,7 @@
       return { starts, eqBox, ctrlBox, boxes: [...starts.map(([x, y], i) => grow(chargeBox(x, y, START_Q[i]))), eqBox] };
     };
     const sl = pageRect(slot);
-    if (sl) {                                       // phones: centred in the room between the name and the photo, control under it all
+    if (sl) {                                       // phones: centred in the room under the photo, control under it all
       const h = 2 * Math.abs(dy) + 2 * r + gap + eqH + gap2 + cH;
       return { ...group((sl.l + sl.r) / 2, (sl.t + sl.b) / 2 - h / 2 + Math.abs(dy) + r, true), right: false, obs };
     }

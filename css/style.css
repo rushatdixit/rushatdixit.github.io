@@ -18,6 +18,7 @@
   --navy: #8fa3ff;                         /* the "navy" accent, lightened so it reads on black */
   --body-size: clamp(17px, 1.9vw, 30px);
   --title-size: clamp(32px, 4.6vw, 76px);
+  --header-fade: clamp(28px, 3.5vw, 56px);   /* the soft edge under the sticky header */
 }
 
 *,
@@ -70,7 +71,7 @@ html {
 }
 
 /* Poisson's equation right above the control, both just left of the photo above the subtitle (on phones, under the
-   starting charges). Placed by js/field.js */
+   starting charges, under the photo). Placed by js/field.js */
 .field-eq,
 .field-controls {
   position: absolute;
@@ -183,7 +184,7 @@ html {
 .hero { cursor: crosshair; }
 .hero > :not(.field-slot) { cursor: auto; }
 
-.field-slot { display: none; }   /* phones only (below): the room for the charges between the name and the photo */
+.field-slot { display: none; }   /* phones only (below): the room for the charges under the photo */
 
 .name {
   position: absolute;
@@ -318,11 +319,12 @@ html {
   object-fit: cover;
 }
 
-/* ---- about: as tall as its text, with room at the bottom for the pixel captions ---- */
+/* ---- about: at most one window tall under the header, so the pixel captions along its bottom are in view where the
+   header's "about" link lands; as tall as its text, with room at the bottom for those captions, if that's taller ---- */
 .about {
   position: relative;
   z-index: 1;                  /* above the shared solar system canvas; no background of its own */
-  min-height: 56.94vw;
+  min-height: min(56.94vw, calc(100svh - var(--header-h, 80px)));
   padding: 3vw var(--page-x) max(9vw, calc(var(--edge-gap) + 4.5rem));
 }
 
@@ -549,10 +551,13 @@ html {
   color: #b57bff;
 }
 
-/* ---- header: after the first screen, static ---- */
+/* ---- header: after the first screen; once it reaches the top of the window it stays there, solid black, with the page
+   blurring and fading into it from below ---- */
 .site-header {
-  position: relative;
-  z-index: 4;
+  position: sticky;
+  top: 0;
+  z-index: 10;                 /* above the sections and the solar canvas, under the planet close-up (50) */
+  background: var(--bg);
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -560,6 +565,25 @@ html {
   gap: 12px 24px;
   padding: clamp(18px, 2.2vw, 32px) var(--page-x);
 }
+
+/* the soft edge under the bar: the page behind it is blurred, and both the black and the blur fade out downwards */
+.site-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: var(--header-fade);
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--bg), transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
+  mask-image: linear-gradient(to bottom, #000, transparent);
+}
+
+/* links to a section land just below the bar (its height is set by js/scroll.js) */
+html { scroll-padding-top: var(--header-h, 80px); }
 
 .site-name {
   font-weight: 700;
@@ -588,17 +612,18 @@ html {
 .projects {
   position: relative;
   z-index: 2;
-  padding: 9vw var(--page-x) 5vw;
+  padding: 3vw var(--page-x) 5vw;   /* the heading and its text sit where about's do */
 }
 
 .section-title { margin-bottom: 1.2vw; }
+.projects .section-title { margin-bottom: 1.6vw; }
 
 .projects-intro {
   max-width: max(52vw, 330px);
-  margin: 0 0 3.4vw;
+  margin: 0 0 2vw;
   font-size: var(--body-size);
   line-height: 1.5;
-  color: var(--ink-3);
+  color: #e3e5ea;
 }
 
 .project-list {
@@ -666,7 +691,263 @@ html {
   color: var(--ink-3);
 }
 
-/* ---- footer ---- */
+/* ---- the tube furnace (js/furnace.js). Its box is the right part of the section, right of the list (js/furnace.js sets
+   --furnace-left), and one window tall under the header: with the section's top under the header (where the header's
+   "projects" link lands) the whole setup is in view, the tube running off the right edge (main clips it, so the page
+   never scrolls sideways) and the leads coming in from the window's edges. On phones it goes under the list,
+   edge to edge, again one screen tall. Nothing that holds the glass may take a filter, an opacity under 1, a mask, a
+   clip-path or a blend mode: any of those would cut the glass off from the planets behind it ---- */
+main { overflow-x: clip; }
+.projects {
+  padding-bottom: 0;             /* the drawing's bottom edge is the section's */
+  overflow-y: clip;              /* the leads and the glow stop at the section's top and bottom; the left and right edges are main's */
+}
+.projects .section-title,
+.projects-intro,
+.project-list { position: relative; z-index: 1; }   /* the text stays over the drawing's glow */
+
+.furnace {
+  --fu: 1vw;                     /* css px per design unit (js/furnace.js) */
+  height: calc(100svh - var(--header-h, 80px));
+  margin: 0;
+  pointer-events: none;          /* only the drawn shapes (.furnace-hit) take the pointer: planets behind the gaps stay clickable */
+}
+
+@media (min-width: 768px) {
+  .projects {
+    min-height: calc(100svh - var(--header-h, 80px));
+    padding-bottom: 5vw;         /* room for the Kanthal under the list, when the list runs below the window */
+  }
+  .project-list { max-width: calc(40vw - var(--page-x)); }   /* the dividers end well before the drawing */
+  .furnace {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: var(--furnace-left, 41.5vw);
+  }
+}
+
+@media (max-width: 767.98px) {
+  .furnace {
+    position: relative;
+    margin: 6vw calc(-1 * var(--page-x)) 0;
+  }
+}
+
+.furnace-link {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;          /* only the drawn shapes (.furnace-hit) take the pointer: planets behind the gaps stay clickable */
+}
+
+.furnace-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.furnace-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* the glass: the tube's outline, blurring (and in Chromium, bending) whatever is behind it, with a faint cool tint */
+.furnace-glass {
+  position: absolute;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(205, 228, 255, 0.10), rgba(205, 228, 255, 0) 32%, rgba(205, 228, 255, 0) 72%, rgba(205, 228, 255, 0.06)),
+    rgba(12, 20, 34, 0.16);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.furnace-svg-glass .furnace-glass { backdrop-filter: url(#furnace-refract) blur(6px); }
+
+.furnace-layer path,
+.furnace-layer line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.furnace .f-edge { stroke: rgba(222, 236, 255, 0.55); stroke-width: max(1px, calc(var(--fu) * 0.11)); }
+.furnace .f-rim { stroke: rgba(230, 242, 255, 0.75); stroke-width: max(1px, calc(var(--fu) * 0.13)); }
+.furnace .f-rim-back { stroke: rgba(230, 242, 255, 0.45); }
+.furnace .f-rim-inner { stroke: rgba(230, 242, 255, 0.35); stroke-width: max(1px, calc(var(--fu) * 0.07)); }
+.furnace .f-ring { fill: rgba(210, 230, 255, 0.10); fill-rule: evenodd; stroke: none; }
+.furnace .f-hl { stroke: url(#furnace-hl); opacity: 0.55; transition: opacity 0.25s; }
+.furnace .f-hl-1 { stroke-width: max(1.5px, calc(var(--fu) * 0.3)); }
+.furnace .f-hl-2 { stroke-width: max(1px, calc(var(--fu) * 0.12)); opacity: 0.32; }
+.furnace .f-sheath { stroke: #9aa0a9; stroke-width: max(3px, calc(var(--fu) * 0.75)); }
+.furnace .f-sheath-hl { stroke: rgba(235, 238, 243, 0.6); stroke-width: max(1px, calc(var(--fu) * 0.12)); }
+.furnace .f-wire { stroke-width: max(1.5px, calc(var(--fu) * 0.24)); }
+.furnace .f-wire-gray { stroke: #8a9099; }
+.furnace .f-wire-red { stroke: #e5483c; }
+.furnace .f-wire-blue { stroke: #4aa8ff; }
+/* the Kanthal leads: the coil's gauge and shading (dimmer at the edges, full at the core), in its cold gray */
+.furnace .f-kanthal { --kw: max(3px, calc(var(--fu) * 0.45)); stroke: rgb(125, 130, 140); }
+.furnace .f-k1 { stroke-width: var(--kw); stroke-opacity: 0.5; }
+.furnace .f-k2 { stroke-width: calc(var(--kw) * 0.62); stroke-opacity: 0.8; }
+.furnace .f-k3 { stroke-width: calc(var(--kw) * 0.3); }
+/* the solder joint where the voltmeter's red lead meets the Kanthal */
+.furnace .f-joint { fill: #a4a9b3; }
+/* the collars where a lead joins a case */
+.furnace .f-collar { stroke: #3c414c; stroke-width: calc(var(--fu) * 0.8); stroke-linecap: butt; }
+.furnace .f-collar-hl { stroke: rgba(255, 255, 255, 0.16); stroke-width: calc(var(--fu) * 0.22); stroke-linecap: butt; }
+
+/* the meters: real boxes, set by js/furnace.js at the tube's angles. The light is from above, so the faces darken downward,
+   the bottom face is the darkest, and the shadow falls below. Red 7-segment digits with their unlit segments faintly
+   behind, in a recessed window under a glass cover */
+.f-m3d {                         /* a zero-size anchor at the middle of the front face: the perspective's centre too */
+  position: absolute;
+  width: 0;
+  height: 0;
+  perspective: calc(var(--persp) * var(--fu));
+}
+.f-box,
+.f-shadow {
+  position: absolute;
+  left: calc(var(--w) * var(--fu) / -2);
+  top: calc(var(--h) * var(--fu) / -2);
+  width: calc(var(--w) * var(--fu));
+  height: calc(var(--h) * var(--fu));
+}
+.f-box {
+  transform-style: preserve-3d;
+  transform: rotateZ(-20deg) rotateY(18deg) rotateX(16deg);   /* AL, BE and TX in js/furnace.js */
+}
+.f-shadow {
+  background: rgba(0, 0, 0, 0.75);
+  filter: blur(calc(var(--fu) * 0.9));
+  transform: translate(calc(var(--fu) * -0.5), calc(var(--fu) * 2.2)) rotate(-20deg);
+}
+.f-side,
+.f-bottom,
+.f-front { position: absolute; }
+.f-side {
+  left: 0;
+  top: 0;
+  width: calc(var(--d) * var(--fu));
+  height: 100%;
+  transform-origin: 0 50%;
+  transform: rotateY(90deg);
+  background: linear-gradient(to bottom, #2a2d35, #16181d);
+}
+.f-bottom {
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(var(--d) * var(--fu));
+  transform-origin: 50% 100%;
+  transform: rotateX(90deg);
+  background: linear-gradient(to right, #15171b, #1d2026);
+}
+.f-front {
+  inset: 0;
+  background: linear-gradient(to bottom, #2f333c, #1f2228 45%, #15171c);
+}
+.f-bevel {                       /* the mitred frame: lit along the top, dark along the bottom */
+  position: absolute;
+  inset: 0;
+  border: solid calc(var(--fu) * 0.26);
+  border-color: #5a616f #3c414c #0f1014 #2a2d35;
+}
+.f-win,
+.f-cover {
+  position: absolute;
+  inset: calc(var(--pad) * var(--fu));
+  border-radius: calc(var(--fu) * 0.22);
+}
+.f-win {
+  background: #050608;
+  box-shadow:
+    inset 0 calc(var(--fu) * 0.32) calc(var(--fu) * 0.6) rgba(0, 0, 0, 0.95),
+    inset 0 0 calc(var(--fu) * 1.1) rgba(255, 59, 47, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.09);
+}
+.f-dial {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.f-cover {                       /* the glass: one soft streak, and the digits' red on it */
+  background:
+    linear-gradient(112deg, rgba(255, 255, 255, 0) 26%, rgba(255, 255, 255, 0.15) 36%, rgba(255, 255, 255, 0.05) 46%, rgba(255, 255, 255, 0) 53%),
+    radial-gradient(ellipse at 50% 55%, rgba(255, 59, 47, 0.1), rgba(255, 59, 47, 0) 72%);
+  box-shadow: inset 0 0 0 1px rgba(255, 110, 95, 0.1);
+}
+.furnace .f-seg { fill: rgba(255, 59, 47, 0.085); }
+.furnace .f-seg.on { fill: #ff3b2f; }
+.furnace .f-digits { filter: drop-shadow(0 0 3px rgba(255, 59, 47, 0.55)); }
+.furnace .f-unit { fill: #ff3b2f; font-family: var(--font); font-weight: 600; }
+
+.furnace-hit path,
+.furnace-hit line,
+.furnace-hit rect { fill: transparent; stroke: transparent; pointer-events: all; cursor: pointer; }
+.furnace-hit .hit-wire { fill: none; stroke-width: max(14px, calc(var(--fu) * 1.2)); pointer-events: stroke; }
+
+/* hovering "tube furnace" in the list, or the drawing itself: a stronger glow and brighter glass highlights */
+.furnace-glow,
+.furnace-coil-front { transition: filter 0.25s; }
+.projects:has(.project-name[href*="tube-furnace"]:hover) .furnace-glow,
+.furnace:hover .furnace-glow { filter: brightness(1.25) saturate(1.1); }
+.projects:has(.project-name[href*="tube-furnace"]:hover) .furnace-coil-front,
+.furnace:hover .furnace-coil-front { filter: brightness(1.18); }
+.projects:has(.project-name[href*="tube-furnace"]:hover) .furnace .f-hl-1,
+.furnace:hover .f-hl-1 { opacity: 0.85; }
+.projects:has(.project-name[href*="tube-furnace"]:hover) .furnace .f-hl-2,
+.furnace:hover .f-hl-2 { opacity: 0.55; }
+
+@media (prefers-reduced-motion: reduce) {
+  .furnace-glow, .furnace-coil-front, .furnace .f-hl { transition: none; }
+}
+
+/* ---- say hi: a page of its own, its background the photo. Between it and projects the background fades slowly from black
+   to the photo's top edge: --sky is that edge (from images/say-hi-tent.jpg, without its stars, and rolling off gently where
+   the mountain reaches the top) stretched downward, sized and placed like the photo, so the two line up at any window shape ---- */
+.sky-fade,
+.site-footer {
+  --sky: linear-gradient(to right,
+    rgb(66,72,84) 0%,
+    rgb(69,77,89) 5%,
+    rgb(75,83,97) 10%,
+    rgb(79,87,101) 15%,
+    rgb(81,89,103) 20%,
+    rgb(83,92,105) 25%,
+    rgb(85,93,106) 30%,
+    rgb(85,93,105) 35%,
+    rgb(85,92,105) 40%,
+    rgb(84,90,103) 45%,
+    rgb(82,87,100) 50%,
+    rgb(79,84,96) 55%,
+    rgb(73,77,88) 60%,
+    rgb(70,73,83) 65%,
+    rgb(61,63,72) 70%,
+    rgb(52,53,61) 75%,
+    rgb(43,44,50) 80%,
+    rgb(39,40,45) 85%,
+    rgb(34,35,39) 90%,
+    rgb(29,29,32) 95%,
+    rgb(23,22,25) 100%);
+  --sky-w: max(100%, calc(100svh * 16 / 9));      /* the photo's width when it covers the window */
+  --sky-x: 50%;
+}
+@media (max-width: 767.98px) {
+  .sky-fade,
+  .site-footer { --sky-x: 91%; }                /* the tent stays in view */
+}
+
+.sky-fade {
+  height: 140svh;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,1.000) 0.0%, rgba(0,0,0,0.980) 8.3%, rgba(0,0,0,0.926) 16.7%, rgba(0,0,0,0.844) 25.0%, rgba(0,0,0,0.741) 33.3%, rgba(0,0,0,0.624) 41.7%, rgba(0,0,0,0.500) 50.0%, rgba(0,0,0,0.376) 58.3%, rgba(0,0,0,0.259) 66.7%, rgba(0,0,0,0.156) 75.0%, rgba(0,0,0,0.074) 83.3%, rgba(0,0,0,0.020) 91.7%, rgba(0,0,0,0.000) 100.0%),
+    var(--sky) var(--sky-x) 0 / var(--sky-w) 100% no-repeat;
+}
+
 .site-footer {
   position: relative;
   z-index: 2;
@@ -674,8 +955,25 @@ html {
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-end;
+  align-content: flex-end;
   gap: 24px;
+  min-height: calc(100svh - var(--header-h, 80px));   /* one window under the header, where its "contact" link lands */
   padding: 6vw var(--page-x) 4vw;
+  background: var(--sky) var(--sky-x) 0 / var(--sky-w) 100% no-repeat;
+}
+
+/* one window tall, so its top runs up behind the header; that top feathers into --sky */
+.footer-photo {
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100svh;
+  object-fit: cover;
+  object-position: var(--sky-x) 0;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16%);
+  mask-image: linear-gradient(to bottom, transparent, #000 16%);
 }
 
 .site-footer .section-title { margin: 0; }

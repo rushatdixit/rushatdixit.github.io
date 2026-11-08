@@ -12,7 +12,11 @@
   // the top of the page after the first screen, measured on resize only (the scroll handler never reads layout)
   let nextTop = 0;
   const docTop = (el) => { let y = 0; for (let e = el; e; e = e.offsetParent) y += e.offsetTop; return y; };
-  const measure = () => { nextTop = docTop(next); };
+  // (from the first screen's bottom: the header is sticky, so its own offset moves once it sticks)
+  const measure = () => {
+    nextTop = docTop(hero) + hero.offsetHeight;
+    document.documentElement.style.setProperty('--header-h', next.offsetHeight + 'px');
+  };
 
   // ---- the first screen fades out over its own height (taller than the window when the layout is stacked) ----
   function onScroll() {
