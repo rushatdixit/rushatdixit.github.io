@@ -12,20 +12,21 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/gochi-hand/400.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/press-start-2p/400.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css">
-  <link rel="stylesheet" href="css/style.css?v=119">
-  <script src="js/brand.js?v=119" defer></script>
-  <script src="js/scroll.js?v=119" defer></script>
-  <script src="js/callout.js?v=119" defer></script>
-  <script src="js/backgrounds.js?v=119" defer></script>
-  <script src="js/bodies.js?v=119" defer></script>
-  <script src="js/solar.js?v=119" defer></script>
-  <script src="js/planet-view.js?v=119" defer></script>
-  <script src="js/planet-callouts.js?v=119" defer></script>
-  <script src="js/furnace.js?v=119" defer></script>
-  <script src="js/pictures.js?v=119" defer></script>
+  <link rel="stylesheet" href="css/style.css?v=123">
+  <script src="js/brand.js?v=123" defer></script>
+  <script src="js/scroll.js?v=123" defer></script>
+  <script src="js/callout.js?v=123" defer></script>
+  <script src="js/backgrounds.js?v=123" defer></script>
+  <script src="js/bodies.js?v=123" defer></script>
+  <script src="js/solar.js?v=123" defer></script>
+  <script src="js/planet-view.js?v=123" defer></script>
+  <script src="js/planet-callouts.js?v=123" defer></script>
+  <script src="js/furnace.js?v=123" defer></script>
+  <script src="js/pictures.js?v=123" defer></script>
+  <script src="js/featured.js?v=123" defer></script>
   <!-- KaTeX comes from a CDN, so it goes last but one: a slow CDN must not hold up anything above. field.js uses it -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js" defer></script>
-  <script src="js/field.js?v=119" defer></script>
+  <script src="js/field.js?v=123" defer></script>
 </head>
 <body>
   <!-- the electric field of the charges in the first screen (js/field.js): the bottom-most layer of the page -->
@@ -147,14 +148,17 @@
     <div class="sky-fade">
       <section class="pictures" id="pictures">
         <h2 class="section-title">pictures</h2>
-        <!-- a collage of frames drifting sideways, built by js/pictures.js (the photos are listed at the top of that file) -->
-        <div class="pictures-reel" role="region" aria-label="photos: a trek in Ladakh, SEMICON India 2026, and the lab">
-          <div class="pictures-track"></div>
-        </div>
+        <!-- four still photos with their titles, arranged anew on every visit by js/featured.js (listed at its top) -->
+        <div class="pictures-featured"></div>
       </section>
     </div>
     <footer class="site-footer" id="contact">
       <img class="footer-photo" src="images/say-hi-tent.jpg" alt="A tent lit blue from inside, under a starry sky in a mountain valley" width="2000" height="1125" loading="lazy" decoding="async">
+      <!-- a collage of frames drifting sideways, centred where the mountain starts in the photo above. Built by
+           js/pictures.js (the photos are listed at the top of that file) -->
+      <div class="pictures-reel" role="region" aria-label="photos: a trek in Ladakh, SEMICON India 2026, and the lab">
+        <div class="pictures-track"></div>
+      </div>
       <h2 class="section-title">say hi</h2>
       <!-- your email goes here: <a class="footer-email" href="mailto:…">…</a> -->
       <p class="footer-links">

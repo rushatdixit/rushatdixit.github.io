@@ -2,15 +2,16 @@
 # Makes the web copies of the pictures wall's photos.
 #
 #   tools/make-pictures.sh photos-src/IMG_1234.HEIC hermitage-cliff [photos-src/IMG_1240.HEIC pinnacle ...]
+#   OUT=images/featured tools/make-pictures.sh …     (the still photos under the title, js/featured.js)
 #
-# Each original (HEIC, JPEG, PNG …) becomes images/pictures/<name>.avif: converted to sRGB, 1600px on its long side,
-# AV1-compressed, with every bit of metadata (GPS location, camera, date) stripped. The originals stay in photos-src/,
-# which git ignores. Prints each result's size and ratio, for the `shape` in js/pictures.js.
+# Each original (HEIC, JPEG, PNG …) becomes $OUT/<name>.avif (images/pictures/ by default): converted to sRGB, 1600px
+# on its long side, AV1-compressed, with every bit of metadata (GPS location, camera, date) stripped. The originals stay
+# in photos-src/, which git ignores. Prints each result's size and ratio, for the `ratio` in js/pictures.js.
 set -euo pipefail
 
 LONG=1600       # px on the long side: the wall's biggest frame is ~600 css px, ~1200 device px on a retina screen
 CRF=38          # AV1 quality: lower is better and bigger
-OUT=images/pictures
+OUT=${OUT:-images/pictures}
 SRGB="/System/Library/ColorSync/Profiles/sRGB Profile.icc"
 
 cd "$(dirname "$0")/.."

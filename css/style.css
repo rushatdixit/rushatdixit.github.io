@@ -952,8 +952,8 @@ main { overflow-x: clip; }
     var(--sky) var(--sky-x) 0 / var(--sky-w) 100% no-repeat;
 }
 
-/* ---- pictures: a wall of frames drifting sideways (js/pictures.js), on the black part of the fade into the sky.
-   One window tall under the header, where its "pictures" link lands, so the whole wall is in view there ---- */
+/* ---- pictures: four still photos with their titles (js/featured.js), on the black part of the fade into the sky.
+   One window tall under the header, where its "pictures" link lands, so all four are in view there ---- */
 .pictures {
   position: relative;
   z-index: 2;
@@ -961,18 +961,64 @@ main { overflow-x: clip; }
   flex-direction: column;
   min-height: calc(100svh - var(--header-h, 80px));
   padding: 3vw var(--page-x) clamp(16px, 2.5vw, 40px);
-  --rows: 8;
-  --cell: clamp(16px, min(5.4svh, 6.5vw), 56px);   /* one grid cell; js/pictures.js sizes it so the rows fill the reel */
-  --gap: clamp(8px, 1.1svh, 14px);
+  margin-bottom: 40svh;           /* the fade to the sky, where the top of the drifting wall reaches up (.pictures-reel) */
 }
 
 .pictures .section-title { align-self: flex-start; margin-bottom: clamp(20px, 3vw, 48px); }
 
-/* all the room under the title: the wall is built exactly this tall (js/pictures.js reads it) */
-.pictures-reel {
+/* all the room under the title; js/featured.js places the photos in it */
+.pictures-featured {
   flex: 1 1 0;
-  min-height: 240px;
-  margin: 0 calc(-1 * var(--page-x));   /* edge to edge */
+  position: relative;
+  min-height: 260px;
+}
+
+/* phones: room for the four one under the other, each nearly the screen's width (js/featured.js picks that layout) */
+@media (max-width: 640px) {
+  .pictures-featured { min-height: calc(4 * (56vw + 72px)); }
+}
+
+.featured {
+  position: absolute;
+  margin: 0;
+}
+
+.featured-frame {
+  display: block;
+  box-sizing: border-box;
+  border: 2px solid var(--ink-3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.featured-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;              /* the frame is the photo's own shape, so nothing is actually cut off */
+}
+
+.featured figcaption {
+  margin-top: 10px;
+  font-size: clamp(14px, 1.15vw, 18px);
+  line-height: 1.3;
+  color: var(--ink-2);
+}
+
+/* ---- the drifting wall (js/pictures.js): in the footer, its middle where the mountain starts in the say-hi photo.
+   The photo is 100svh tall at the footer's bottom and fades in over its top 16%, so the ridge shows from about 8% down:
+   92svh above the footer's bottom on any screen. The wall is built exactly as tall as this box ---- */
+.pictures-reel {
+  --rows: 8;
+  --cell: clamp(16px, min(5.4svh, 6.5vw), 56px);   /* one grid cell; js/pictures.js sizes it so the rows fill the reel */
+  --gap: clamp(8px, 1.1svh, 14px);
+  --reel-h: clamp(280px, 64svh, 680px);
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  bottom: calc(92svh - var(--reel-h) / 2);
+  height: var(--reel-h);
   overflow: hidden;
   -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
   mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
