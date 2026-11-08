@@ -3,7 +3,8 @@
 // To add a photo: put the original in photos-src/ (git ignores it), run
 //   tools/make-pictures.sh photos-src/IMG_1234.heic some-name
 // and list images/pictures/some-name.avif here with the ratio (width / height) the script prints. The wall gives each
-// photo a frame close to its own shape; a frame can still take `shape` (see SHAPES) to force one.
+// photo a frame close to its own shape; a frame can still take `shape` (see SHAPES) to force one, and `last: true`
+// puts a photo at the end of the wall.
 const PICTURES = [
   { src: 'images/pictures/valley-stupa-pano.avif',     ratio: 3.02, alt: 'A wide valley with a white stupa, under big clouds' },
   { src: 'images/pictures/horse-snow-peaks.avif',      ratio: 0.56, alt: 'A horse grazing below snow peaks and a blue sky' },
@@ -44,7 +45,7 @@ const PICTURES = [
   { src: 'images/pictures/airport-food.avif',          ratio: 1.78, alt: 'Two of us eating at an airport food court' },
   { src: 'images/pictures/bus-selfie.avif',            ratio: 1.78, alt: 'A cramped, grinning selfie with friends and backpacks' },
   { src: 'images/pictures/exhibition-halls.avif',      ratio: 1.33, alt: 'Our group sitting outside the SEMICON India exhibition halls' },
-  { src: 'images/pictures/plush-bunny.avif',           ratio: 0.75, alt: 'Two of us holding a purple plush bunny' },
+  { src: 'images/pictures/plush-bunny.avif',           ratio: 0.75, alt: 'Two of us holding a purple plush bunny', last: true },
   { src: 'images/pictures/cafe-table.avif',            ratio: 1.33, alt: 'Our group around a cafe table in the exhibition hall' },
   { src: 'images/pictures/semicon-group.avif',         ratio: 1.96, alt: 'Our group lined up beside the SEMICON India Transform Tomorrow sign' },
   { src: 'images/pictures/semicon-group-selfie.avif',  ratio: 1.81, alt: 'A group selfie with conference badges' },
@@ -146,21 +147,49 @@ const PICTURES = [
   // after: the track slides left by exactly one wall and starts over, so the loop has no seam.
   function build() {
     track.textContent = '';
-    // the cell size that makes the rows fill the reel, the room under the title, exactly
-    const cs = getComputedStyle(reel);
-    const rows = parseFloat(cs.getPropertyValue('--rows')) || 8;
-    const gap = parseFloat(cs.getPropertyValue('--gap')) || 12;
-    const height = reel.clientHeight;
-    if (height > 40) reel.style.setProperty('--cell', `${(height - (rows - 1) * gap) / rows}px`);
-    const size = { cell: parseFloat(getComputedStyle(reel).getPropertyValue('--cell')) || 56, gap, rows };
-
     const wall = document.createElement('div');
     wall.className = 'pictures-wall';
     track.appendChild(wall);
+
+    // the cell size that makes the rows fill the reel, the room under the title, exactly. The gap is read off the
+    // laid-out wall: --gap itself is a clamp() expression, not a number
+    const rows = parseFloat(getComputedStyle(reel).getPropertyValue('--rows')) || 8;
+    const gap = parseFloat(getComputedStyle(wall).rowGap) || 12;
+    const height = reel.clientHeight;
+    if (height > 40) reel.style.setProperty('--cell', `${(height - (rows - 1) * gap) / rows}px`);
+    const size = { cell: parseFloat(getComputedStyle(reel).getPropertyValue('--cell')) || 56, gap, rows };
     const rand = rng(7);
     const need = window.innerWidth;
+    const rest = PICTURES.filter((p) => !p.last);
     for (let round = 0; round < 20 && (round === 0 || wall.scrollWidth < need); round++) {
-      for (const pic of shuffled(PICTURES, rand)) wall.appendChild(frame(pic, size, rand, wall.children.length < EAGER));
+      for (const pic of shuffled(rest, rand)) wall.appendChild(frame(pic, size, rand, wall.children.length < EAGER));
+    }
+    // `last: true` photos close the wall, whatever the shuffle says. Left to the dense packing they would drop into an
+    // earlier hole, and a photo given a fixed spot makes the packing flow the others around and past it. So the packed
+    // frames are frozen where they landed first, then the last ones go in the columns after them, centred on the height.
+    const pitch = size.cell + gap;
+    // (all read first, then all written: writing one would re-flow the rest before they are read)
+    const spots = [...wall.children].map((el) => ({
+      el,
+      c0: Math.round((el.offsetLeft - wall.offsetLeft) / pitch) + 1,
+      r0: Math.round((el.offsetTop - wall.offsetTop) / pitch) + 1,
+      c: Math.round((el.offsetWidth + gap) / pitch),
+      r: Math.round((el.offsetHeight + gap) / pitch),
+    }));
+    let col = 1;
+    for (const { el, c0, r0, c, r } of spots) {
+      el.style.gridColumn = `${c0} / span ${c}`;
+      el.style.gridRow = `${r0} / span ${r}`;
+      col = Math.max(col, c0 + c);
+    }
+    for (const pic of PICTURES.filter((p) => p.last)) {
+      const el = frame(pic, size, rand, false);
+      const c = parseInt(el.style.gridColumn.replace('span ', ''), 10);
+      const r = parseInt(el.style.gridRow.replace('span ', ''), 10);
+      el.style.gridColumn = `${col} / span ${c}`;
+      el.style.gridRow = `${Math.floor((rows - r) / 2) + 1} / span ${r}`;
+      wall.appendChild(el);
+      col += c;
     }
     // the copy is only there for the loop: screen readers and the keyboard get each photo once
     const copy = wall.cloneNode(true);
