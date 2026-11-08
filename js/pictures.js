@@ -49,27 +49,39 @@ const PLACEHOLDERS = 24;
     });
   }
 
-  // Frames go into columns. Every column is exactly as tall as the wall: its frames share one width, so their heights
-  // (width / ratio) plus the gaps add up to the wall's height. A column takes 1–4 frames, as many as it needs to come
-  // down to a randomly picked width, which is what makes the wall irregular without leaving holes.
+  // Frames go into columns of 1–4, as many as a column needs to come down to a randomly picked width. Then it is all
+  // loosened, so it looks hung by hand rather than packed: a column is 72–100% of the wall's height at a random height
+  // on it, each frame is 70–100% of its column's width (aligned left, centre or right; the spare height goes between
+  // the frames), and the space before each column is 1–3.5 gaps.
+  const ALIGN = ['flex-start', 'center', 'flex-end'];
   function columns(frames, height, gap, rand) {
     const cols = [];
     let i = 0;
     while (i < frames.length) {
       const target = height * (0.28 + rand() * 0.32);
+      const colH = height * (0.72 + rand() * 0.28);
       const col = [frames[i++]];
-      const width = () => (height - (col.length - 1) * gap) / col.reduce((s, f) => s + 1 / f.ratio, 0);
+      const width = () => (colH - (col.length - 1) * gap) / col.reduce((s, f) => s + 1 / f.ratio, 0);
       while (col.length < 4 && i < frames.length && width() > target) col.push(frames[i++]);
-      cols.push({ frames: col, width: width() });
+      const w = width();
+      cols.push({
+        width: w,
+        height: colH,
+        top: rand() * (height - colH),
+        left: cols.length ? gap * (1 + rand() * 2.5) : 0,   // the first column starts flush: the seam gap is the wall's own margin
+        frames: col.map((f) => ({ ...f, width: col.length > 1 || f.ratio < 1.2 ? w * (0.7 + rand() * 0.3) : w,
+                                       align: ALIGN[Math.floor(rand() * 3)] })),
+      });
     }
     return cols;
   }
 
-  function frameEl(f, w) {
+  function frameEl(f) {
     const el = document.createElement('div');
     el.className = 'picture';
-    el.style.width = `${w}px`;
-    el.style.height = `${w / f.ratio}px`;
+    el.style.width = `${f.width}px`;
+    el.style.height = `${f.width / f.ratio}px`;
+    el.style.alignSelf = f.align;
     if (f.src) {
       const img = document.createElement('img');
       img.src = f.src;
@@ -96,7 +108,7 @@ const PLACEHOLDERS = 24;
     let wallW = 0;
     for (let round = 0; round < 20 && (round === 0 || wallW < window.innerWidth); round++) {
       frames.push(...base);
-      wallW = columns(frames, height, gap, rng(11)).reduce((s, c) => s + c.width + gap, 0);
+      wallW = columns(frames, height, gap, rng(11)).reduce((s, c) => s + c.left + c.width, 0);
     }
 
     const wall = document.createElement('div');
@@ -104,7 +116,11 @@ const PLACEHOLDERS = 24;
     for (const c of columns(frames, height, gap, rng(11))) {
       const col = document.createElement('div');
       col.className = 'pictures-col';
-      for (const f of c.frames) col.appendChild(frameEl(f, c.width));
+      col.style.width = `${c.width}px`;
+      col.style.height = `${c.height}px`;
+      col.style.marginTop = `${c.top}px`;
+      col.style.marginLeft = `${c.left}px`;
+      for (const f of c.frames) col.appendChild(frameEl(f));
       wall.appendChild(col);
     }
     track.appendChild(wall);

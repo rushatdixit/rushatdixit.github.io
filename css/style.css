@@ -992,14 +992,15 @@ main { overflow-x: clip; }
 /* columns of frames, each column exactly the wall's height (js/pictures.js sizes every frame) */
 .pictures-wall {
   display: flex;
-  gap: var(--gap);
-  margin-right: var(--gap);              /* the same gap at the seam between the wall and its copy */
+  align-items: flex-start;               /* each column sets its own height and offset (js/pictures.js) */
+  margin-right: var(--gap);              /* the gap at the seam between the wall and its copy */
   height: 100%;
 }
 
 .pictures-col {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;        /* a column's spare height goes between its frames */
   gap: var(--gap);
   flex: none;
 }
