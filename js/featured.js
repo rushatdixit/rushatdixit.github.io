@@ -27,10 +27,14 @@ const FEATURED = [
     [shown[i], shown[j]] = [shown[j], shown[i]];
   }
 
+  // the sides: alternating from a random start, or forced for testing with ?order=LRLR (L: photo on the left, R: on the
+  // right; repeated if shorter than the list)
   const firstRight = Math.random() < 0.5;
+  const forced = (new URLSearchParams(location.search).get('order') || '').toUpperCase().replace(/[^LR]/g, '');
+  const right = (i) => (forced ? forced[i % forced.length] === 'R' : (i % 2 === 0) === firstRight);
   shown.forEach((pic, i) => {
     const fig = document.createElement('figure');
-    fig.className = `featured ${(i % 2 === 0) === firstRight ? 'featured--right' : 'featured--left'}`;
+    fig.className = `featured ${right(i) ? 'featured--right' : 'featured--left'}`;
     fig.style.setProperty('--w', `${62 + Math.random() * 12}%`);   // share of the section's width
     fig.style.setProperty('--ratio', String(pic.ratio));
     const frame = document.createElement('div');
@@ -48,4 +52,5 @@ const FEATURED = [
     fig.append(frame, cap);
     box.appendChild(fig);
   });
+  box.dispatchEvent(new Event('featuredlayout'));   // js/pictures-wire.js routes its wire round these
 })();

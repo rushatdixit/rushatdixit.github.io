@@ -6,10 +6,10 @@
 // the thermocouple, the start of the coil and the three meters) into the figure's box by one scale, whichever of width or
 // height runs out first, and as far left as the text beside it allows, which leaves more of the tube in view on the right:
 // the box is the right part of the section and one window tall under the header, so with the
-// section's top under the header (where the header's "projects" link lands) everything is in view. Only the leads (in from
-// the window's edges) leave it. The heating wire is one Kanthal wire from edge to edge: in from the left edge, under the
-// list, through the ammeter, along the tube to 95% of the window's width, and off the right edge. The tube stops just
-// after the coil.
+// section's top under the header (where the header's "projects" link lands) everything is in view. Only the leads leave
+// it. The heating wire is one Kanthal wire: from a coil of it beside the pictures heading (js/pictures-wire.js draws that
+// stretch and the coil; here the lead starts just under the ammeter), through the ammeter, along the tube to 95% of the
+// window's width, and off the right edge. The tube stops just after the coil.
 //
 // Layers, back to front, inside the figure's link (all built here):
 //   back SVG (the thermocouple inside the tube) and the back half of the coil (a canvas), both under the glass, which
@@ -301,12 +301,15 @@
   const caseBottom = Math.max(...boxCorners(AMP).map((p) => p[1]));
   const voltTop = P(VOLT.a1, VOLT.c1);            // the voltmeter's top-right corner: the right lead passes over it
   let hotL = [], hotR = [];                       // the first stretch of each lead, still glowing
+  let stub = null;                                // the left lead's last stretch: js/pictures-wire.js carries it on from its end
   function edgeWires(xL, xR, yB, listU) {
-    // left: on from the ammeter's bottom face, turning under its corner, then one long sweep below the list
-    const yL = Math.max(caseBottom + 1.6, listU + 1.8);
-    const sweep = [ampOut, [ampOut[0], yL], [ampOut[0] - (ampOut[0] - xL) * 0.45, yL], [xL - 1, yL]];
-    setKanthal(leadL, [leadDrop, sweep]);
-    hotL = hotStretch([leadDrop, sweep]);
+    // left: out of the ammeter's bottom face and a short way straight down. From there the lead is drawn by
+    // js/pictures-wire.js, down to the coil of wire beside the pictures heading (it can't be drawn here: the section clips)
+    const yS = Math.max(ampOut[1] + 1, Math.min(caseBottom + 3, yB - 0.5));
+    stub = [ampOut, [ampOut[0], ampOut[1] + (yS - ampOut[1]) / 3], [ampOut[0], ampOut[1] + (2 * (yS - ampOut[1])) / 3], [ampOut[0], yS]];
+    setKanthal(leadL, [leadDrop, stub]);
+    hotL = hotStretch([leadDrop, stub]);
+    const sweep = stub;
     // right: off the tube's front and bottom edge, through the gap over the voltmeter's corner, off the right edge
     const e = coil.end;
     const curve = [e, add(e, coil.endDir, 3.5), [xR - 2.5, voltTop[1] - 0.75], [xR + 1, voltTop[1] + 1]];
@@ -315,7 +318,7 @@
     // the voltmeter's: each leaves the bottom face square to the case. Red hangs slack, drooping under the ammeter and up
     // into the Kanthal just past it, so the meter reads across the heater's supply; blue goes off the right edge
     const t3 = sideOut(VOLT, VOLT.a0 + 3), t4 = sideOut(VOLT, VOLT.a0 + 12);
-    const joint = bez(sweep, 0.12);
+    const joint = bez(sweep, 0.4);                                   // 40% down the stub: the meter reads across the heater
     const belly = joint[1] + Math.min(6, yB - joint[1] - 0.9);       // its lowest point: a slack droop, inside the section
     const slack = (Y) => [t3, add(t3, down, (Y - t3[1]) / -n1[1]), [joint[0] + (t3[0] - joint[0]) * 0.3, Y], joint];
     let lo = joint[1], hi = joint[1] + 40;                           // how deep the handles go to droop just that far
@@ -441,6 +444,7 @@
     edgeWires(x - fr.left / scale, x + vwU, y + secB / scale, y + listB / scale);
     buildMasks();
     render(true);
+    fig.dispatchEvent(new Event('furnacelayout'));   // js/pictures-wire.js re-routes the lead's continuation
   }
 
   // the tube stops just after the coil: its far end, and everything that runs along it, follow the coil's end
@@ -680,4 +684,13 @@
   fig.furnaceFreeze = (on) => { frozen = !!on; if (!frozen) wake(); };
   fig.furnaceStep = (dt) => { for (let t = 0; t < dt; t += 1 / 60) step(Math.min(1 / 60, dt - t)); render(true); };
   fig.furnaceMeters = () => [tempM, ampM, voltM].map((m) => m.rect());
+  // where the left lead's stub ends, in page coordinates, and the lead's widths on screen (css px), for js/pictures-wire.js
+  fig.furnaceLeadEnd = () => {
+    const p = leadL.ps[0];
+    const m = p.getScreenCTM();
+    if (!stub || !m) return null;
+    const e = stub[3], pt0 = new DOMPoint(e[0], e[1]).matrixTransform(m);
+    const w = leadL.ps.map((q) => parseFloat(getComputedStyle(q).strokeWidth) || 3);
+    return { x: pt0.x + window.scrollX, y: pt0.y + window.scrollY, widths: w };
+  };
 })();

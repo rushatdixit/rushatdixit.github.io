@@ -967,14 +967,54 @@ main { overflow-x: clip; }
   padding: 3vw var(--page-x) clamp(16px, 2.5vw, 40px);
 }
 
-.pictures .section-title { align-self: flex-start; margin-bottom: clamp(20px, 3vw, 48px); }
+/* below the heading: room for the Kanthal wire (js/pictures-wire.js) to leave its coil, beside the heading, and pass
+   between the coil and the first photo with its clearance on both sides */
+.pictures .section-title {
+  align-self: flex-start;
+  margin-bottom: max(clamp(20px, 3vw, 48px), calc(2 * max(16px, 1.5vw) + 26px));
+}
 
-/* the photos one after another down the section, hanging left and right in turn (js/featured.js) */
+/* the photos one after another down the section, hanging left and right in turn (js/featured.js). On wider screens a
+   little padding at each side keeps a lane, between the photos (or titles) and the window's edge, for the wire */
 .pictures-featured {
   display: flex;
   flex-direction: column;
   gap: clamp(48px, 7vw, 120px);
+  padding-inline: max(0px, calc(2 * max(16px, 1.5vw) + 18px - var(--page-x)));
 }
+
+@media (max-width: 699px) {
+  .pictures .section-title { margin-bottom: 36px; }
+  .pictures-featured { padding-inline: 0; }
+}
+
+/* ---- the coil of Kanthal wire and the wire itself (js/pictures-wire.js): the same gray and the same three strokes as
+   the furnace's (.f-kanthal), laid over the page under all text and images ---- */
+.pwire {
+  position: absolute;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+.pwire path,
+.pwire line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.pw-k1 { stroke: rgb(125, 130, 140); stroke-opacity: 0.5; }
+.pw-k2 { stroke: rgb(125, 130, 140); stroke-opacity: 0.8; }
+.pw-k3 { stroke: rgb(125, 130, 140); }
+.pw-spiral.pw-k2,
+.pw-spiral.pw-k3 { stroke: url(#pw-light); }      /* the roll's top face, lit from the top left */
+.pw-rim { stroke: rgb(125, 130, 140); stroke-opacity: 0.55; }
+.pw-rim-0 { fill: #1b1d21; }
+.pw-rim-1 { fill: #24272c; }
+.pw-rim-2 { fill: #2d3036; }
+.pw-face { fill: #33363c; }
+.pw-hub { fill: #141619; stroke: rgb(125, 130, 140); stroke-opacity: 0.7; }
+.pw-spokes { stroke: #a2a8b1; stroke-opacity: 0.85; }
+.pw-tip { fill: #eef1f5; fill-opacity: 0.55; }
+.pw-cap { stroke: rgb(165, 170, 180); stroke-linecap: butt; }
+.pw-debug rect { fill: rgba(255, 70, 70, 0.1); stroke: rgba(255, 70, 70, 0.6); stroke-width: 1; }
+.pw-debug polyline { fill: none; stroke: #2fe0ff; stroke-width: 1.5; }
 
 /* a photo and its title beside it, at the photo's bottom edge: photo on the left, or on the right (--right) */
 .featured {
