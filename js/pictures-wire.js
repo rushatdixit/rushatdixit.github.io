@@ -1,17 +1,15 @@
 // The Kanthal wire's other end. The furnace's left lead (js/furnace.js) stops just under its ammeter; from there this
-// draws it on, as a fixed lead down to a coil of the same wire, a roll standing on its edge and facing us, resting beside
-// the "pictures" heading. As the reader scrolls, the coil rolls down the section, keeping to 60% of the window's height,
-// and lays the wire out behind it: it
-// weaves down the open side of each photo and across the gap to the open side of the next, shrinking as it gives wire
-// and turning as it goes, until only its hub is left, just under the last title. Scrolling back up winds it in again.
+// draws it on, as a fixed lead down to beside the "pictures" heading. As the reader scrolls, the wire is laid on down the
+// section, its end keeping to 60% of the window's height: it weaves down the open side of each photo and across the gap
+// to the open side of the next, and ends just under the last title. Scrolling back up draws it back in.
 //
 // The photos are placed at random on every visit, so the way is found on the live page: the photos, their titles and
-// the heading are measured and blown up by the coil's size plus a clearance, a waypoint is set in the free lane beside
-// each photo, and an A* search on a coarse grid joins them up, preferring to keep going down the page. The corners are
-// rounded off into a smooth cable, each checked against the obstacles again. The fixed lead is routed the same way, round
-// the project list and the furnace's meters.
+// the heading are measured and blown up by a generous clearance, a waypoint is set in the free lane beside each photo,
+// and an A* search on a coarse grid joins them up, preferring to keep going down the page. The corners are rounded off
+// into a smooth cable, each checked against the obstacles again. The fixed lead is routed the same way, round the
+// project list and the furnace's meters.
 //
-// Everything is drawn in one SVG laid over the page, under all text and images, that never takes the pointer.
+// The wire is drawn in one SVG laid over the page, under all text and images, that never takes the pointer.
 // ?debugpath=1 also draws the blown-up obstacles, the waypoints and the raw grid routes; ?order=LRLR (js/featured.js)
 // forces the photos' sides; window.__pictureWire has hooks for tests.
 (() => {
@@ -27,16 +25,14 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const debug = new URLSearchParams(location.search).get('debugpath') === '1';
   const NS = 'http://www.w3.org/2000/svg';
-  // the roll's axle runs back into the page up and to the right at the furnace's 20°: you see its front face, and a
-  // sliver of its curved side and back face beyond it
   const AX = [Math.cos((20 * Math.PI) / 180), -Math.sin((20 * Math.PI) / 180)];
-  const TIP_AT = 0.6;                   // the coil keeps to this height of the window
+  const TIP_AT = 0.6;                   // the wire's end keeps to this height of the window
   const DAMP = 0.09;                    // seconds: how quickly it catches up (it is pulled, not snapped)
   const TURN = 6, UP = 25;              // A*: extra cost of a turn, and of every step up the page
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const f = (v) => +v.toFixed(2);
 
-  /* ---------------- the overlay: the wires first, the coil on top of them ---------------- */
+  /* ---------------- the overlay ---------------- */
   const el = (name, attrs = {}, parent) => {
     const e = document.createElementNS(NS, name);
     for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -46,14 +42,6 @@
   const svg = el('svg', { class: 'pwire', 'aria-hidden': 'true', focusable: 'false' });
   main.insertBefore(svg, skyFade || section);
   const defs = el('defs', {}, svg);
-  // the coil's light: from the top left, on its curved side (across it) and on its front face (a soft spot)
-  const grad = (tag, id, attrs, stops) => {
-    const g = el(tag, { id, ...attrs }, defs);
-    for (const [o, c, a = 1] of stops) el('stop', { offset: o, 'stop-color': c, 'stop-opacity': a }, g);
-  };
-  grad('linearGradient', 'pw-band', { x1: 0, y1: 0, x2: 1, y2: 1 }, [[0, '#a7acb4'], [0.45, '#6d727a'], [1, '#2b2e33']]);
-  grad('radialGradient', 'pw-face', { cx: 0.36, cy: 0.32, r: 0.75 }, [[0, '#9ea3ab'], [0.55, '#5f646c'], [1, '#2e3136']]);
-  grad('radialGradient', 'pw-shadow', { cx: 0.5, cy: 0.5, r: 0.5 }, [[0, '#000', 0.55], [1, '#000', 0]]);
   // A wire is round metal lit from the top left: a soft shadow down-right, the steel body, a lighter mid-tone and a
   // narrow highlight, the lit strokes shifted toward the light. Shifted the same way whichever way the wire runs, the
   // highlight lands on its lit edge: the left of a run going down, the top of one going across.
@@ -66,22 +54,12 @@
   const gWire = el('g', {}, svg);
   const lead = strand(gWire);
   const laid = strand(gWire);
-  const gCoil = el('g', { class: 'pw-coil' }, svg);
-  const shadow = el('ellipse', { class: 'pw-shadow' }, gCoil);
-  const back = el('circle', { class: 'pw-back' }, gCoil);
-  const band = el('path', { class: 'pw-band' }, gCoil);
-  const wraps = el('path', { class: 'pw-wraps' }, gCoil);
-  const wrapsHl = el('path', { class: 'pw-wraps-hl' }, gCoil);
-  const face = el('circle', { class: 'pw-face' }, gCoil);
-  const spiral = strand(gCoil, 'pw-spiral');
-  const hub = el('circle', { class: 'pw-hub' }, gCoil);
-  const hubRim = el('circle', { class: 'pw-hub-rim' }, gCoil);
-  const spokes = el('path', { class: 'pw-spokes' }, gCoil);
   const gDebug = debug ? el('g', { class: 'pw-debug' }, svg) : null;
 
-  /* ---------------- the coil's shape ---------------- */
-  // A face of radius r at the centre, the back face DEPTH further along the axle: from its centre the coil reaches r to
-  // the left and down, r + the axle's sideways offset to the right, r + its upward offset up (plus half the wire).
+  /* ---------------- the clearance round the wire's way ---------------- */
+  // The clearance kept round the wire's way: what a roll of radius r and width `depth`, its axle running back at 20°,
+  // would reach from its centre (r left and down, r plus the axle's offsets right and up, plus half the wire). It was
+  // the coil's room; it keeps the wire well clear of the photos and gives the weave its lanes.
   const reach = (r, depth, hw) => ({ l: r + hw, r: r + depth * AX[0] + hw, u: r - depth * AX[1] + hw, d: r + hw });
 
   /* ---------------- measuring (one read phase) ---------------- */
@@ -311,12 +289,12 @@
   const blowUp = (r, p) => ({ x0: r.x0 - p.l, y0: r.y0 - p.t, x1: r.x1 + p.r, y1: r.y1 + p.b });
   const clearOf = (list) => (x, y) => !list.some((r) => x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1);
 
-  /* ---------------- the plan: where the coil rests, the way it rolls, and the fixed lead ---------------- */
+  /* ---------------- the plan: where the wire starts, the way it is laid, and the fixed lead ---------------- */
   function plan(m) {
     const { W, vw, phone } = m;
     const c = phone ? 8 : Math.max(16, 1.5 * vw);           // clearance round everything
     const cs = phone ? 4 : 10;                               // grid cell
-    const edgeM = phone ? 4 : 8;                             // how close the coil may come to the window's sides
+    const edgeM = phone ? 4 : 8;                             // how close that room may come to the window's sides
     const corner = (phone ? 3 : 2.5) * vw;
     const wire = m.lead && m.lead.width ? m.lead.width : Math.max(3, 0.45 * vw);   // the Kanthal's width, as the furnace draws it
     const hw = wire / 2;
@@ -329,8 +307,8 @@
     const C0 = [cx, cy];
     const restRect = { x0: cx - R.l, y0: cy - R.u, x1: cx + R.r, y1: cy + R.d };
 
-    // The coil's way. A centre must keep the coil's reach plus c from every obstacle (to its left, right, above and
-    // below), and the whole coil inside the window.
+    // The wire's way. A point on it must keep that reach plus c from every obstacle (to its left, right, above and
+    // below), and the whole reach inside the window.
     const pad = { l: R.r + c, r: R.l + c, t: R.d + c, b: R.u + c };
     const xLo = edgeM + R.l, xHi = W - edgeM - R.r;
     const obs = [...m.frames, ...m.caps, m.heading];
@@ -359,11 +337,11 @@
       from = stops[k];
       dir = leg.dir;
     }
-    // the corners rounded so that the coil (not just the wire) still keeps clear of everything
+    // the corners rounded so that the way still keeps all that room
     const coilClear = clearOf(obs.map((r) => blowUp(r, { l: R.r + 2, r: R.l + 2, t: R.d + 2, b: R.u + 2 })));
     const path = pts ? smooth(simplify(pts), corner, coilClear) : null;
 
-    // the fixed lead: from the furnace's stub, round the list and the meters, to just above the resting coil, then down
+    // the fixed lead: from the furnace's stub, round the list and the meters, to just above where the laid wire starts, then down
     // into its centre (where the laid wire starts)
     let leadS = null, leadR = null, leadGoal = null;
     const obsLead = [...m.leadObs, m.heading, restRect, ...m.frames, ...m.caps];
@@ -379,7 +357,7 @@
         const lp = simplify(snapEnds(S, leadGoal, leg.cells));
         lp.push([leadGoal[0], cy]);
         const lc = clearOf([...m.leadObs, m.heading, ...m.frames, ...m.caps].map((r) => blowUp(r, { l: hw + 2, r: hw + 2, t: hw + 2, b: hw + 2 })));
-        leadS = smooth(simplify(lp), corner, lc, restRect.y0 - leadGoal[1] - 1);   // done turning before it reaches the coil
+        leadS = smooth(simplify(lp), corner, lc, restRect.y0 - leadGoal[1] - 1);   // done turning before the drop
       }
     }
 
@@ -404,13 +382,8 @@
     svg.setAttribute('viewBox', `0 ${f(top)} ${m.W} ${f(bottom - top)}`);
     setStrand(lead, wire);
     setStrand(laid, wire);
-    setStrand(spiral, wire * 0.8);                           // the turns on the face, a touch finer
     setD(lead, P.leadS ? P.leadS.d : '');
     setD(laid, P.path ? P.path.d : '');
-    wraps.setAttribute('stroke-width', f(Math.max(0.8, wire * 0.28)));
-    wrapsHl.setAttribute('stroke-width', f(Math.max(0.6, wire * 0.16)));
-    hubRim.setAttribute('stroke-width', f(Math.max(1, wire * 0.35)));
-    spokes.setAttribute('stroke-width', f(Math.max(1, wire * 0.45)));
     if (gDebug) {
       gDebug.textContent = '';
       const rect = (r) => el('rect', { x: f(r.x0), y: f(r.y0), width: f(r.x1 - r.x0), height: f(r.y1 - r.y0) }, gDebug);
@@ -418,13 +391,12 @@
       for (const r of P.obsLead) rect(blowUp(r, { l: P.c, r: P.c, t: P.c, b: P.c }));
       for (const cells of [...P.raw, P.leadR || []]) if (cells.length) el('polyline', { points: cells.map((q) => `${f(q[0])},${f(q[1])}`).join(' ') }, gDebug);
       for (const w of [...P.wps, P.E]) el('circle', { cx: f(w[0]), cy: f(w[1]), r: 4 }, gDebug);
-      if (!P.path) console.warn('pictures-wire: no way found for the coil');
+      if (!P.path) console.warn('pictures-wire: no way found for the wire');
       if (P.m.lead && !P.leadS) console.warn('pictures-wire: no route for the fixed lead');
     }
-    lastKey = '';
   }
 
-  // the point at length s along the coil's way (between samples, so it glides)
+  // the point at length s along the wire's way (between samples, so it glides)
   function pointAt(s) {
     const { ss, xs, ys } = P.path;
     let lo = 0, hi = ss.length - 1;
@@ -433,7 +405,7 @@
     const t = (s - ss[lo - 1]) / ((ss[lo] - ss[lo - 1]) || 1);
     return [xs[lo - 1] + (xs[lo] - xs[lo - 1]) * t, ys[lo - 1] + (ys[lo] - ys[lo - 1]) * t];
   }
-  // how far along the coil should be when it is to be level with page height y: the first length at which its way has
+  // how much wire is laid when its end is to be level with page height y: the first length at which its way has
   // got down that far (a running maximum, so the length never jumps back where the way climbs)
   function sOfY(y) {
     if (!P || !P.path || y <= P.path.ys[0]) return 0;
@@ -443,73 +415,19 @@
     while (lo < hi) { const mid = (lo + hi) >> 1; if (ym[mid] < y) lo = mid + 1; else hi = mid; }
     return P.path.ss[lo];
   }
-  const radiusAt = (s) => {
-    const { rFull, rHub, L } = P, frac = L ? clamp(s / L, 0, 1) : 0;
-    return Math.sqrt(rHub * rHub + (rFull * rFull - rHub * rHub) * (1 - frac));
-  };
 
-  let lastKey = '', drawCost = 0;
-  const arcPath = (c, r) => {                                // the half of a circle on the axle's side: what shows of the curved side
-    const n = [-AX[1], AX[0]];                               // square to the axle (pointing down and to the right)
-    const a = [c[0] + n[0] * r, c[1] + n[1] * r], b = [c[0] - n[0] * r, c[1] - n[1] * r];
-    return `M${f(a[0])},${f(a[1])} A${f(r)},${f(r)} 0 0 0 ${f(b[0])},${f(b[1])}`;
-  };
+  let drawCost = 0;
   function draw(s) {
     const t0 = performance.now();
-    const { wire, L, rFull, rHub, depth } = P;
-    const r = radiusAt(s);
-    const spin = reduceMotion ? 0 : (2 * L * (rFull - r)) / (rFull * rFull - rHub * rHub);   // it rolls: ∫ds/r
-    const [cx, cy] = P.path ? pointAt(s) : P.C0;
-    // the wire laid so far, from where the coil rested to where it is now (under it)
-    for (const p of laid) { p.style.strokeDasharray = `${f(s)} ${f(L + 50)}`; p.style.visibility = s > 0.5 ? '' : 'hidden'; }
-    const key = `${f(cx)},${f(cy)},${f(r)},${f(spin)}`;
-    if (key !== lastKey) {
-      lastKey = key;
-      const C = [cx, cy], B = [cx + AX[0] * depth, cy + AX[1] * depth];
-      const n = [-AX[1], AX[0]];
-      // a soft shadow on the page under it, the back face, then the curved side between the faces
-      shadow.setAttribute('cx', f(cx + AX[0] * depth * 0.5)); shadow.setAttribute('cy', f(cy + r));
-      shadow.setAttribute('rx', f(r * 1.1 + depth * 0.4)); shadow.setAttribute('ry', f(Math.max(2, r * 0.16)));
-      back.setAttribute('cx', f(B[0])); back.setAttribute('cy', f(B[1])); back.setAttribute('r', f(r));
-      const p1 = [cx + n[0] * r, cy + n[1] * r], p2 = [cx - n[0] * r, cy - n[1] * r];
-      band.setAttribute('d', `M${f(p1[0])},${f(p1[1])} L${f(p1[0] + AX[0] * depth)},${f(p1[1] + AX[1] * depth)} `
-        + `A${f(r)},${f(r)} 0 0 0 ${f(p2[0] + AX[0] * depth)},${f(p2[1] + AX[1] * depth)} L${f(p2[0])},${f(p2[1])} `
-        + `A${f(r)},${f(r)} 0 0 1 ${f(p1[0])},${f(p1[1])} Z`);
-      // the outermost turns across the side: one every wire's width along the axle
-      const k = Math.max(2, Math.round(depth / (wire * 1.1)));
-      let wd = '', wh = '';
-      for (let i = 1; i < k; i++) {
-        const q = [cx + AX[0] * depth * (i / k), cy + AX[1] * depth * (i / k)];
-        wd += arcPath(q, r) + ' ';
-        wh += arcPath([q[0] - wire * 0.25, q[1] - wire * 0.25], r) + ' ';
-      }
-      wraps.setAttribute('d', wd);
-      wrapsHl.setAttribute('d', wh);
-      // the front face and the turns of wire on it, from the hub out, turning as it rolls
-      face.setAttribute('cx', f(cx)); face.setAttribute('cy', f(cy)); face.setAttribute('r', f(r));
-      const pitch = wire * 1.05, turns = Math.max(0.6, (r - rHub - wire * 0.4) / pitch), steps = Math.ceil(turns * 48);
-      let d = '';
-      for (let i = 0; i <= steps; i++) {
-        const t = spin + (2 * Math.PI * turns * i) / steps, rho = rHub + wire * 0.4 + ((r - rHub - wire * 0.9) * i) / steps;
-        d += `${i ? ' L' : 'M'}${f(cx + rho * Math.cos(t))},${f(cy + rho * Math.sin(t))}`;
-      }
-      setD(spiral, d);
-      // the hub: a dark hole with a lit rim and three spokes
-      hub.setAttribute('cx', f(cx)); hub.setAttribute('cy', f(cy)); hub.setAttribute('r', f(rHub));
-      hubRim.setAttribute('cx', f(cx)); hubRim.setAttribute('cy', f(cy)); hubRim.setAttribute('r', f(rHub));
-      let sd = '';
-      for (let j = 0; j < 3; j++) {
-        const t = spin + (j * 2 * Math.PI) / 3;
-        sd += `M${f(cx + rHub * 0.2 * Math.cos(t))},${f(cy + rHub * 0.2 * Math.sin(t))} L${f(cx + rHub * 0.85 * Math.cos(t))},${f(cy + rHub * 0.85 * Math.sin(t))} `;
-      }
-      spokes.setAttribute('d', sd);
-    }
-    state.s = s; state.r = r; state.spin = spin; state.pos = [cx, cy];
+    // the wire laid so far, from beside the heading to its end (the strokes' round caps make the end)
+    for (const p of laid) { p.style.strokeDasharray = `${f(s)} ${f(P.L + 50)}`; p.style.visibility = s > 0.5 ? '' : 'hidden'; }
+    state.s = s;
+    state.pos = P.path ? pointAt(s) : P.C0;
     drawCost = drawCost * 0.9 + (performance.now() - t0) * 0.1;
   }
 
   /* ---------------- the loop: routes when the layout changes, follows the scroll ---------------- */
-  const state = { s: 0, r: 0, spin: 0, pos: [0, 0], reroutes: 0, ratioBefore: null, ratioAfter: null, history: [] };
+  const state = { s: 0, pos: [0, 0], reroutes: 0, ratioBefore: null, ratioAfter: null, history: [] };
   let sCur = 0, needRoute = true, snap = true, req = 0, lastTs = 0;
   const target = () => sOfY(window.scrollY + TIP_AT * window.innerHeight);
   function frame(ts) {
@@ -555,45 +473,38 @@
   const inside = (r, x, y) => x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1;
   const overlap = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
   window.__pictureWire = {
-    state: () => ({ ...state, history: state.history.slice(), L: P ? P.L : 0, rFull: P ? P.rFull : 0, rHub: P ? P.rHub : 0,
+    state: () => ({ ...state, history: state.history.slice(), L: P ? P.L : 0,
       rest: P ? P.C0 : null, end: P ? P.E : null, routed: !!(P && P.path), leadRouted: !!(P && P.leadS),
       leadStart: P && P.m.lead ? [P.m.lead.x, P.m.lead.y] : null,
       leadEnd: P && P.leadS ? [P.leadS.xs[P.leadS.xs.length - 1], P.leadS.ys[P.leadS.ys.length - 1]] : null,
       drawMs: drawCost, posViewportY: state.pos[1] - window.scrollY }),
     samples: () => (P && P.path ? { xs: P.path.xs.slice(), ys: P.path.ys.slice(), ss: P.path.ss.slice() } : null),
-    obstacles: () => (P ? { coil: P.obs, lead: P.obsLead, pad: P.pad, clearance: P.c } : null),
-    // check(): along the coil's whole way (every 2px), the coil as it is there (its size at that point) and the wire
-    // under it, against the photos, titles and heading as they are (not blown up); and the fixed lead against all of
-    // those and the list and meters. The lead's only contact is its drop into the resting coil.
+    obstacles: () => (P ? { wire: P.obs, lead: P.obsLead, pad: P.pad, clearance: P.c } : null),
+    // check(): every pixel of the wire's way against the photos, titles and heading as they are (not blown up) and the
+    // window's sides; and the fixed lead against all of those and the list and meters.
     check() {
       if (!P) return { ok: false, reason: 'no plan' };
       const m = P.m, hits = [];
       const named = [...m.frames.map((r, i) => ({ r, name: `photo ${i + 1}` })), ...m.caps.map((r, i) => ({ r, name: `title ${i + 1}` })), { r: m.heading, name: 'heading' }];
       if (P.path) {
-        const { xs, ys, ss } = P.path, hw = P.hw;
-        let next = 0;
+        const { xs, ys } = P.path;
         for (let i = 0; i < xs.length; i++) {
           for (const o of named) if (inside(o.r, xs[i], ys[i])) hits.push({ what: 'wire', at: [f(xs[i]), f(ys[i])], obstacle: o.name });
-          if (ss[i] < next && i < xs.length - 1) continue;
-          next = ss[i] + 2;
-          const R = reach(radiusAt(ss[i]), P.depth, hw);
-          const coil = { x0: xs[i] - R.l, y0: ys[i] - R.u, x1: xs[i] + R.r, y1: ys[i] + R.d };
-          for (const o of named) if (overlap(coil, o.r)) hits.push({ what: 'coil', at: [f(xs[i]), f(ys[i])], obstacle: o.name });
-          if (coil.x0 < 0 || coil.x1 > m.W) hits.push({ what: 'coil', at: [f(xs[i]), f(ys[i])], obstacle: 'window edge' });
+          if (xs[i] - P.hw < 0 || xs[i] + P.hw > m.W) hits.push({ what: 'wire', at: [f(xs[i]), f(ys[i])], obstacle: 'window edge' });
         }
       }
       if (P.leadS) {
         const { xs, ys } = P.leadS, goalY = P.leadGoal[1];
-        const leadObs = [...m.leadObs.map((r, i) => ({ r, name: `furnace/list ${i + 1}` })), ...named, { r: P.restRect, name: 'coil at rest' }];
+        const leadObs = [...m.leadObs.map((r, i) => ({ r, name: `furnace/list ${i + 1}` })), ...named, { r: P.restRect, name: 'start' }];
         for (let i = 0; i < xs.length; i++) for (const o of leadObs) {
-          if (o.name === 'coil at rest' && ys[i] >= goalY - 1 && Math.abs(xs[i] - P.C0[0]) < 1) continue;   // the drop into it
+          if (o.name === 'start' && ys[i] >= goalY - 1 && Math.abs(xs[i] - P.C0[0]) < 1) continue;   // the drop into it
           if (inside(o.r, xs[i], ys[i])) hits.push({ what: 'lead', at: [f(xs[i]), f(ys[i])], obstacle: o.name });
         }
       }
       return { ok: !!P.path && (!m.lead || !!P.leadS) && hits.length === 0, routed: !!P.path, leadRouted: !!P.leadS,
         waypoints: P.wps.length, figures: m.figs.length, hits: hits.slice(0, 20), hitCount: hits.length };
     },
-    // zigzag(): at each photo's mid-height the coil's way is on that photo's open side
+    // zigzag(): at each photo's mid-height the wire's way is on that photo's open side
     zigzag() {
       if (!P || !P.path) return { ok: false, figures: [] };
       const { xs, ys } = P.path;
