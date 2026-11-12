@@ -286,10 +286,11 @@
   const tl = P(TEMP.a0 + 0.6, TEMP.c0);           // the temperature display's lower-left corner
   const tcLead = [tcOut, add(tcOut, [-1.6, -1.8]), [tl[0] - 6, tl[1] + 4.5], tl];
   setWire(wire('f-wire-gray', 'thermocouple'), tcLead);
-  // the Kanthal's two leads: the coil's own gauge and shading, in its cold gray; layout() sets them, as they reach the window's edges
+  // the Kanthal's two leads, drawn as round metal wire lit from the top left: a soft shadow down-right, the steel body, a
+  // lighter mid-tone and a narrow highlight, each shifted toward the light (layout() sets the shifts, in units)
   const kanthal = (name) => {
-    const ps = ['f-k1', 'f-k2', 'f-k3'].map((c) => el('path', { class: `f-kanthal ${c}` }, wires));
-    ps[0].dataset.wire = name;
+    const ps = ['f-k0', 'f-k1', 'f-k2', 'f-k3'].map((c) => el('path', { class: `f-kanthal ${c}` }, wires));
+    ps[1].dataset.wire = name;
     return { ps, h: el('path', { class: 'hit-wire' }, hit) };
   };
   const curvesD = (cs) => cs.map((c, i) => (i ? `C${pt(c[1])} ${pt(c[2])} ${pt(c[3])}` : bezD(c))).join(' ');
@@ -436,6 +437,11 @@
     for (const s of [back, front, terms, hit]) s.setAttribute('viewBox', vb);
     for (const m of [tempM, ampM, voltM]) Object.assign(m.anchor.style, { left: `${((m.ctr[0] - x) / vwU) * 100}%`, top: `${((m.ctr[1] - y) / vhU) * 100}%` });
     fig.style.setProperty('--fu', `${scale}px`);
+    {
+      const kw = Math.max(3, scale * 0.45) / scale;           // the lead's width, in units
+      const shifts = [[0.45, 0.7], [0, 0], [-0.12, -0.12], [-0.24, -0.24]];
+      for (const k of [leadL, leadR]) k.ps.forEach((q, i) => q.setAttribute('transform', `translate(${f(shifts[i][0] * kw)} ${f(shifts[i][1] * kw)})`));
+    }
     coilBox = { x: Math.max(x, 42), y, w: x + vwU + 1 - Math.max(x, 42), h: vhU };
     glowBox = { x: 30, y, w: x + vwU + 1 - 30, h: vhU };
     place(backCv, coilBox); place(frontCv, coilBox); place(glowCv, glowBox);
@@ -686,11 +692,11 @@
   fig.furnaceMeters = () => [tempM, ampM, voltM].map((m) => m.rect());
   // where the left lead's stub ends, in page coordinates, and the lead's widths on screen (css px), for js/pictures-wire.js
   fig.furnaceLeadEnd = () => {
-    const p = leadL.ps[0];
+    const p = leadL.ps[1];                         // the body stroke (the others are shifted for the light)
     const m = p.getScreenCTM();
     if (!stub || !m) return null;
     const e = stub[3], pt0 = new DOMPoint(e[0], e[1]).matrixTransform(m);
-    const w = leadL.ps.map((q) => parseFloat(getComputedStyle(q).strokeWidth) || 3);
-    return { x: pt0.x + window.scrollX, y: pt0.y + window.scrollY, widths: w };
+    const w = parseFloat(getComputedStyle(p).strokeWidth) || 3;
+    return { x: pt0.x + window.scrollX, y: pt0.y + window.scrollY, width: w };
   };
 })();

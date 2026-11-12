@@ -792,10 +792,12 @@ main { overflow-x: clip; }
 .furnace .f-wire-red { stroke: #e5483c; }
 .furnace .f-wire-blue { stroke: #4aa8ff; }
 /* the Kanthal leads: the coil's gauge and shading (dimmer at the edges, full at the core), in its cold gray */
-.furnace .f-kanthal { --kw: max(3px, calc(var(--fu) * 0.45)); stroke: rgb(125, 130, 140); }
-.furnace .f-k1 { stroke-width: var(--kw); stroke-opacity: 0.5; }
-.furnace .f-k2 { stroke-width: calc(var(--kw) * 0.62); stroke-opacity: 0.8; }
-.furnace .f-k3 { stroke-width: calc(var(--kw) * 0.3); }
+/* the Kanthal leads: round metal wire lit from the top left (js/furnace.js shifts the strokes toward the light) */
+.furnace .f-kanthal { --kw: max(3px, calc(var(--fu) * 0.45)); }
+.furnace .f-k0 { stroke: #000; stroke-opacity: 0.45; stroke-width: calc(var(--kw) * 1.5); }
+.furnace .f-k1 { stroke: #5c6169; stroke-width: var(--kw); }
+.furnace .f-k2 { stroke: #979ca4; stroke-width: calc(var(--kw) * 0.6); }
+.furnace .f-k3 { stroke: #eef1f4; stroke-opacity: 0.9; stroke-width: calc(var(--kw) * 0.22); }
 /* the solder joint where the voltmeter's red lead meets the Kanthal */
 .furnace .f-joint { fill: #a4a9b3; }
 /* the collars where a lead joins a case */
@@ -993,8 +995,9 @@ main { overflow-x: clip; }
   .pictures-featured { padding-inline: 0; }
 }
 
-/* ---- the coil of Kanthal wire and the wire itself (js/pictures-wire.js): the same gray and the same three strokes as
-   the furnace's (.f-kanthal), laid over the page under all text and images ---- */
+/* ---- the coil of Kanthal wire and the wire itself (js/pictures-wire.js), laid over the page under all text and
+   images. The wire is round metal lit from the top left, like the furnace's Kanthal leads (.f-k0-3): a soft shadow, the
+   steel body, a lighter mid-tone and a narrow highlight; the coil is a roll standing on its edge, facing us ---- */
 .pwire {
   position: absolute;
   left: 0;
@@ -1002,20 +1005,21 @@ main { overflow-x: clip; }
   pointer-events: none;
   overflow: visible;
 }
-.pwire path,
-.pwire line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.pw-k1 { stroke: rgb(125, 130, 140); stroke-opacity: 0.5; }
-.pw-k2 { stroke: rgb(125, 130, 140); stroke-opacity: 0.8; }
-.pw-k3 { stroke: rgb(125, 130, 140); }
-.pw-spiral.pw-k2,
-.pw-spiral.pw-k3 { stroke: url(#pw-light); }      /* the roll's top face, lit from the top left */
-.pw-rim { stroke: rgb(125, 130, 140); stroke-opacity: 0.55; }
-.pw-rim-0 { fill: #1b1d21; }
-.pw-rim-1 { fill: #24272c; }
-.pw-rim-2 { fill: #2d3036; }
-.pw-face { fill: #33363c; }
-.pw-hub { fill: #141619; stroke: rgb(125, 130, 140); stroke-opacity: 0.7; }
-.pw-spokes { stroke: #a2a8b1; stroke-opacity: 0.85; }
+.pwire path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.pw-s0 { stroke: #000; stroke-opacity: 0.45; }
+.pw-s1 { stroke: #5c6169; }
+.pw-s2 { stroke: #979ca4; }
+.pw-s3 { stroke: #eef1f4; stroke-opacity: 0.9; }
+.pw-shadow { fill: url(#pw-shadow); }
+.pw-back { fill: #1c1e22; stroke: #4a4e55; stroke-width: 1; }
+.pw-band { fill: url(#pw-band); stroke: #2a2d32; stroke-width: 1; }
+.pw-wraps { stroke: #24272c; stroke-opacity: 0.85; }
+.pw-wraps-hl { stroke: #c9cdd3; stroke-opacity: 0.35; }
+.pw-face { fill: url(#pw-face); stroke: #3a3e44; stroke-width: 1; }
+.pw-spiral.pw-s0 { stroke-opacity: 0.35; }
+.pw-hub { fill: #0e0f11; }
+.pw-hub-rim { fill: none; stroke: #b9bec6; stroke-opacity: 0.8; }
+.pw-spokes { stroke: #8d939c; }
 .pw-debug rect { fill: rgba(255, 70, 70, 0.1); stroke: rgba(255, 70, 70, 0.6); stroke-width: 1; }
 .pw-debug polyline { fill: none; stroke: #2fe0ff; stroke-width: 1.5; }
 .pw-debug circle { fill: #ffd84a; }
